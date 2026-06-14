@@ -29,6 +29,11 @@ jobs:
         run: |
           mkdir -p dist
           cp index.html dist/index.html
+          cp manifest.webmanifest dist/manifest.webmanifest
+          cp icon-192.png dist/icon-192.png
+          cp icon-512.png dist/icon-512.png
+          cp icon-maskable-192.png dist/icon-maskable-192.png
+          cp icon-maskable-512.png dist/icon-maskable-512.png
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
