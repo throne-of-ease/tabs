@@ -1,0 +1,3798 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vlakové tabule</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --flip-duration: 40ms;
+      --bg: #0b0e11;
+      --surface: #141a20;
+      --surface-2: #1d252c;
+      --text: #f5f7fa;
+      --muted: #aab4bf;
+      --line: rgba(255, 255, 255, 0.14);
+      --accent: #f4c542;
+      --green: #3ddc84;
+      --red: #ff6b6b;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background:
+        linear-gradient(180deg, rgba(20, 26, 32, 0.92), rgba(10, 12, 15, 0.98)),
+        radial-gradient(circle at top left, rgba(244, 197, 66, 0.13), transparent 32rem);
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    button,
+    select,
+    input {
+      min-height: 42px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .app {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      padding: 14px 0 18px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: end;
+    }
+
+    .mode-switch {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.65rem, 3vw, 2.7rem);
+      line-height: 1;
+    }
+
+    .brand p,
+    .hint,
+    .form-note,
+    .form-status {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .clock {
+      min-width: 176px;
+      text-align: right;
+    }
+
+    .board-clock {
+      display: grid;
+      justify-items: end;
+      gap: 2px;
+      min-width: 110px;
+    }
+
+    .board-clock .clock-value {
+      font-size: clamp(1.1rem, 2.2vw, 1.65rem);
+    }
+
+    .clock-button {
+      display: block;
+      width: 100%;
+      min-height: 0;
+      padding: 0;
+      color: inherit;
+      text-align: inherit;
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+    }
+
+    .clock-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .clock-value {
+      display: block;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: clamp(1.7rem, 4vw, 3rem);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .clock-mode-label {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .page-tabs,
+    .control-grid,
+    .segmented,
+    .actions,
+    .list-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .page-tabs {
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab-button,
+    .segment,
+    .icon-button,
+    .secondary-button,
+    .danger-button,
+    .submit-button {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      padding: 9px 13px;
+    }
+
+    .icon-button {
+      width: 44px;
+      min-width: 44px;
+      padding: 0;
+      font-size: 1.35rem;
+      line-height: 1;
+    }
+
+    .tab-button {
+      border-bottom-color: transparent;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .tab-button.active,
+    .segment.active {
+      background: var(--accent);
+      color: #111;
+      border-color: var(--accent);
+      font-weight: 800;
+    }
+
+    .submit-button {
+      background: var(--accent);
+      color: #111;
+      border-color: var(--accent);
+      font-weight: 900;
+    }
+
+    .danger-button {
+      border-color: rgba(255, 107, 107, 0.55);
+      color: #ffd0d0;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .settings-panel {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding: 14px;
+      background: rgba(20, 26, 32, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .settings-panel[hidden] {
+      display: none;
+    }
+
+    .settings-panel.highlight {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .settings-header h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .compact-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .compact-row input {
+      width: 110px;
+    }
+
+    input[type="range"] {
+      min-height: 28px;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    .range-value {
+      min-width: 4.2rem;
+      color: var(--accent);
+      font-weight: 900;
+      text-align: right;
+    }
+
+    .controls,
+    .form-shell,
+    .management-grid > section {
+      background: rgba(20, 26, 32, 0.76);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      margin-bottom: 16px;
+    }
+
+    .board-layout {
+      display: grid;
+      grid-template-columns: minmax(520px, var(--board-panel-size, 70fr)) 10px minmax(240px, var(--schema-panel-size, 30fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .board-layout.schema-hidden {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .board-layout.schema-hidden .layout-resizer,
+    .board-layout.schema-hidden .movement-panel {
+      display: none;
+    }
+
+    .layout-resizer {
+      min-width: 10px;
+      min-height: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+      cursor: col-resize;
+    }
+
+    .layout-resizer:hover,
+    .layout-resizer:focus-visible,
+    .layout-resizer.dragging {
+      background: var(--accent);
+      outline: none;
+    }
+
+    .schema-toggle {
+      width: 34px;
+      min-width: 34px;
+      min-height: 30px;
+      padding: 0;
+      font-size: 1rem;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label,
+    .control-label,
+    .section-title {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    select,
+    input,
+    textarea {
+      width: 100%;
+      padding: 8px 10px;
+      color: var(--text);
+      background: #0e1318;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    .toggle {
+      display: inline-grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .toggle input {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--accent);
+    }
+
+    .board-shell {
+      background: #07090b;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .movement-panel {
+      position: relative;
+      min-height: 100%;
+      padding: 14px;
+      overflow: hidden;
+      background: #091016;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .movement-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .movement-title-main {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .movement-stage {
+      position: relative;
+      min-height: 240px;
+      aspect-ratio: 4 / 3;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+        #0c141b;
+    }
+
+    .station-minimap-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 240px;
+    }
+
+    .station-map-grid {
+      stroke: rgba(255, 255, 255, 0.07);
+      stroke-width: 0.35;
+    }
+
+    .station-rail,
+    .airport-route {
+      fill: none;
+      stroke: rgba(190, 205, 219, 0.32);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .station-rail.active,
+    .airport-route.active {
+      stroke: var(--accent);
+      stroke-dasharray: 6 7;
+      animation: routeFlow 2.4s linear infinite;
+      filter: drop-shadow(0 0 5px rgba(242, 201, 76, 0.2));
+    }
+
+    .platform-node,
+    .airport-gate-node {
+      fill: #13212b;
+      stroke: rgba(255, 255, 255, 0.56);
+      stroke-width: 1.2;
+    }
+
+    .platform-node.active,
+    .airport-gate-node.active {
+      fill: #21303a;
+      stroke: var(--accent);
+    }
+
+    .station-hub,
+    .airport-terminal {
+      fill: #0f1a22;
+      stroke: rgba(255, 255, 255, 0.7);
+      stroke-width: 1.2;
+    }
+
+    .station-hub-core,
+    .airport-terminal-core {
+      fill: var(--accent);
+    }
+
+    .platform-label,
+    .airport-label,
+    .direction-label {
+      fill: var(--muted);
+      font-size: 3.5px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .platform-label.active,
+    .airport-label.active {
+      fill: var(--text);
+    }
+
+    .airport-apron {
+      fill: rgba(255, 255, 255, 0.05);
+      stroke: rgba(255, 255, 255, 0.16);
+      stroke-width: 0.8;
+    }
+
+    .airport-runway {
+      fill: #18232c;
+      stroke: rgba(255, 255, 255, 0.5);
+      stroke-width: 0.9;
+    }
+
+    .airport-runway-center {
+      stroke: rgba(255, 255, 255, 0.58);
+      stroke-width: 0.6;
+      stroke-dasharray: 4 4;
+      stroke-linecap: round;
+    }
+
+    .airport-taxiway {
+      fill: none;
+      stroke: rgba(190, 205, 219, 0.28);
+      stroke-width: 0.95;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .airport-taxiway.connector {
+      stroke: rgba(190, 205, 219, 0.42);
+      stroke-width: 0.75;
+    }
+
+    .airport-taxiway.active {
+      stroke: var(--accent);
+    }
+
+    .direction-label {
+      fill: rgba(255, 255, 255, 0.48);
+      font-size: 3px;
+    }
+
+    .station-train-marker {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.42));
+    }
+
+    .station-train-marker rect {
+      fill: var(--accent);
+      stroke: rgba(0, 0, 0, 0.35);
+      stroke-width: 0.8;
+    }
+
+    .station-train-marker text {
+      fill: #111;
+      font-size: 3.1px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .station-train-marker.arrival rect {
+      fill: #7dd3fc;
+    }
+
+    .station-train-marker.arrival text {
+      fill: #071018;
+    }
+
+    .airport-plane-marker {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.42));
+    }
+
+    .airport-plane-marker .plane-disc {
+      display: none;
+    }
+
+    .airport-plane-marker.arrival .plane-disc {
+      display: none;
+    }
+
+    .airport-plane-marker .plane-icon {
+      fill: #f4c542;
+      stroke: rgba(0, 0, 0, 0.48);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .airport-plane-marker .plane-icon {
+      stroke-width: 0.55;
+    }
+
+    .airport-plane-marker.arrival .plane-icon {
+      fill: #f4c542;
+      stroke: rgba(0, 0, 0, 0.48);
+    }
+
+    .airport-plane-marker.alert .plane-icon {
+      fill: var(--red);
+    }
+
+    .airport-plane-marker text {
+      fill: #f7f7f2;
+      stroke: none;
+      font-size: 2.35px;
+      font-weight: 900;
+      letter-spacing: 0;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .announcement-banner {
+      margin-top: 10px;
+      padding: 8px 10px;
+      color: var(--accent);
+      background: rgba(244, 197, 66, 0.08);
+      border: 1px solid rgba(244, 197, 66, 0.26);
+      border-radius: 8px;
+      font-size: 0.86rem;
+      font-weight: 800;
+    }
+
+    .presentation-dim {
+      transition: opacity 160ms ease, filter 160ms ease;
+    }
+
+    body.play-mode .brand,
+    body.play-mode #modeControls,
+    body.play-mode .top-actions > .clock,
+    body.play-mode #settingsToggle,
+    body.play-mode .page-tabs,
+    body.play-mode .settings-panel,
+    body.play-mode .controls,
+    body.play-mode .announcement-banner,
+    body.play-mode .detail-actions {
+      display: none !important;
+    }
+
+    body.play-mode .app {
+      width: 100%;
+      padding-top: 64px;
+    }
+
+    body.play-mode .topbar {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 20;
+      display: block;
+      padding: 0;
+    }
+
+    body.play-mode .top-actions {
+      justify-content: end;
+    }
+
+    @keyframes routeFlow {
+      to { stroke-dashoffset: -26; }
+    }
+
+    .rail-track,
+    .runway,
+    .taxiway {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.42);
+      border-radius: 999px;
+    }
+
+    .rail-track::before,
+    .runway::before {
+      content: attr(data-label);
+      position: absolute;
+      left: 0;
+      bottom: 8px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .train-marker,
+    .plane-marker {
+      position: absolute;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 28px;
+      color: #111;
+      background: var(--accent);
+      border: 2px solid rgba(0, 0, 0, 0.28);
+      border-radius: 7px;
+      font-size: 0.72rem;
+      font-weight: 900;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+      transform: translate(-50%, -50%);
+      transition: left 900ms ease, top 900ms ease, transform 900ms ease;
+    }
+
+    .plane-marker {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+    }
+
+    .gate {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 32px;
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.72rem;
+      font-weight: 900;
+      transform: translate(-50%, -50%);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .station-rail.active,
+      .airport-route.active {
+        animation: none;
+      }
+    }
+
+    .board-header,
+    .detail-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      background: #10161c;
+    }
+
+    .detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: end;
+    }
+
+    .station-name,
+    .detail-title {
+      margin: 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .station-name {
+      font-size: clamp(1.2rem, 3vw, 2.05rem);
+    }
+
+    .board-type {
+      color: var(--accent);
+      font-weight: 900;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .row-grid {
+      display: grid;
+      grid-template-columns: minmax(78px, 0.66fr) minmax(100px, 0.84fr) minmax(190px, 1.82fr) minmax(76px, 0.62fr) minmax(180px, 1.5fr) minmax(92px, 0.78fr);
+      gap: 12px;
+      align-items: center;
+    }
+
+    .board-headings {
+      padding: 9px 14px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .board-rows {
+      display: grid;
+      grid-template-rows: repeat(8, minmax(54px, auto));
+    }
+
+    .train-row {
+      width: 100%;
+      min-height: 54px;
+      border: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 0;
+      padding: 0 14px;
+      color: inherit;
+      text-align: left;
+      background: transparent;
+    }
+
+    .train-row:not(.empty):hover,
+    .train-row:not(.empty):focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      background: rgba(244, 197, 66, 0.08);
+    }
+
+    .cell {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .time-cell,
+    .line-cell {
+      font-family: "Consolas", "Courier New", monospace;
+      font-weight: 900;
+    }
+
+    .delay.positive {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .delay.neutral {
+      color: var(--green);
+    }
+
+    .empty .cell {
+      color: rgba(255, 255, 255, 0.24);
+    }
+
+    .empty-message {
+      padding: 10px 16px 14px;
+      color: var(--muted);
+      background: #090c0f;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .board-detail {
+      padding: 16px;
+    }
+
+    .retro-detail-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .retro-detail-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.75fr) minmax(0, 2fr);
+      gap: 10px;
+      align-items: center;
+      min-height: 48px;
+      padding: 0 10px;
+      background: #0d0d0d;
+      border: 1px solid #242424;
+      border-radius: 6px;
+    }
+
+    .retro-detail-row .label-cell {
+      color: var(--muted);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .detail-item {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .detail-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .detail-item strong {
+      display: block;
+      margin-top: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    .train-form,
+    .station-form {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .train-form .wide,
+    .station-form .wide {
+      grid-column: span 2;
+    }
+
+    .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    body.mode-train .airport-only,
+    body.mode-airport .train-only {
+      display: none !important;
+    }
+
+    .field-error {
+      min-height: 18px;
+      color: #ff8d8d;
+      font-size: 0.78rem;
+    }
+
+    .invalid input,
+    .invalid select {
+      border-color: #ff8d8d;
+      box-shadow: 0 0 0 2px rgba(255, 141, 141, 0.16);
+    }
+
+    .management-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .data-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .data-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .data-card strong,
+    .data-card span {
+      display: block;
+    }
+
+    .data-card span {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .import-export {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .design-digital .board-shell {
+      background: #061c55;
+      border-color: rgba(219, 230, 255, 0.7);
+    }
+
+    .design-digital .board-header,
+    .design-digital .detail-header,
+    .design-digital .board-headings {
+      background: linear-gradient(90deg, #092a7e, #0e53b6);
+    }
+
+    .design-digital .train-row {
+      background: linear-gradient(90deg, #06248f, #123ca1);
+    }
+
+    .design-digital .train-row:nth-child(even) {
+      background: linear-gradient(90deg, #082b9b, #1749ad);
+    }
+
+    .design-retro .board-shell {
+      background: #080808;
+      border: 8px solid #2a2a2a;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.82), var(--shadow);
+    }
+
+    .design-retro .board-header,
+    .design-retro .detail-header,
+    .design-retro .board-headings {
+      background: #121212;
+    }
+
+    .design-retro .train-row {
+      background: #0d0d0d;
+      border-bottom-color: #242424;
+    }
+
+    .design-retro .cell {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+
+    .flap-char {
+      position: relative;
+      display: inline-block;
+      width: clamp(10px, 1.55vw, 16px);
+      height: 28px;
+      line-height: 28px;
+      text-align: center;
+      color: #f6f1d7;
+      background: linear-gradient(#242424 0%, #050505 49%, #171717 50%, #030303 100%);
+      border: 1px solid #303030;
+      border-radius: 3px;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: clamp(0.72rem, 1.4vw, 1rem);
+      font-weight: 900;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.85);
+      transform-style: preserve-3d;
+      flex: 0 0 auto;
+    }
+
+    .flap-char::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.16);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.9);
+    }
+
+    .flap-char.flip {
+      animation: splitFlip var(--flip-duration) linear;
+    }
+
+    @keyframes splitFlip {
+      0% { transform: rotateX(0deg); filter: brightness(1); }
+      49% { transform: rotateX(-88deg); filter: brightness(0.55); }
+      50% { transform: rotateX(88deg); filter: brightness(0.65); }
+      100% { transform: rotateX(0deg); filter: brightness(1); }
+    }
+
+    @media (max-width: 920px) {
+      .control-grid,
+      .train-form,
+      .station-form,
+      .import-export,
+      .board-layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .board-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .layout-resizer {
+        display: none;
+      }
+
+      .row-grid {
+        grid-template-columns: minmax(72px, 0.7fr) minmax(88px, 0.82fr) minmax(138px, 1.55fr) minmax(64px, 0.62fr) minmax(136px, 1.35fr) minmax(78px, 0.72fr);
+        gap: 8px;
+      }
+
+      .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app {
+        padding: 10px;
+      }
+
+      .topbar,
+      .board-header,
+      .detail-header,
+      .data-card {
+        grid-template-columns: 1fr;
+      }
+
+      .clock {
+        text-align: left;
+      }
+
+      .top-actions {
+        justify-content: space-between;
+      }
+
+      .control-grid,
+      .train-form,
+      .station-form,
+      .detail-grid,
+      .import-export,
+      .board-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .movement-stage {
+        min-height: 280px;
+        aspect-ratio: auto;
+      }
+
+      .train-form .wide,
+      .station-form .wide {
+        grid-column: auto;
+      }
+
+      .board-headings {
+        display: none;
+      }
+
+      .board-rows {
+        grid-template-rows: repeat(8, minmax(74px, auto));
+      }
+
+      .train-row {
+        min-height: 74px;
+        padding: 9px 10px;
+      }
+
+      .row-grid {
+        grid-template-columns: 62px 72px minmax(0, 1fr);
+        gap: 6px;
+      }
+
+      .platform-cell,
+      .status-cell,
+      .delay-cell {
+        grid-column: span 1;
+        font-size: 0.82rem;
+      }
+
+      .flap-char {
+        width: 9px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 0.68rem;
+      }
+    }
+  </style>
+</head>
+<body class="design-digital mode-train">
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1 id="appTitle">Vlakové tabule</h1>
+        <p id="appSubtitle">Statická demo data pro prezentaci a testování, ne aktuální jízdní řád.</p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" type="button" id="playModeToggle" title="Prezentační režim" aria-pressed="false">▶</button>
+        <div class="mode-switch segmented" id="modeControls" aria-label="Režim dopravy">
+          <button class="segment" type="button" data-value="train">Vlak</button>
+          <button class="segment" type="button" data-value="airport">Letiště</button>
+        </div>
+        <div class="clock" aria-live="polite">
+          <button class="clock-button" type="button" id="clockButton" title="Nastavení času">
+          <span class="clock-value" id="clockValue">--:--</span>
+          <span class="clock-mode-label" id="clockModeLabel">Manuální čas</span>
+          </button>
+        </div>
+        <button class="icon-button" type="button" id="settingsToggle" aria-expanded="false" aria-controls="settingsPanel" title="Nastavení">⚙</button>
+      </div>
+    </header>
+
+    <nav class="page-tabs presentation-dim" aria-label="Záložky stránky">
+      <button class="tab-button active" type="button" data-tab="boardPanel">Tabule</button>
+      <button class="tab-button" type="button" data-tab="entryPanel" id="entryTabButton">Zadání vlaku</button>
+      <button class="tab-button" type="button" data-tab="dataPanel">Správa dat</button>
+    </nav>
+
+    <section class="settings-panel" id="settingsPanel" aria-label="Nastavení" hidden>
+      <div class="settings-header">
+        <h2>Nastavení</h2>
+        <button class="secondary-button" type="button" id="settingsClose">Zavřít</button>
+      </div>
+      <div class="field">
+        <label for="acceleratedMultiplierInput">Násobek zrychleného času</label>
+        <div class="compact-row">
+          <input id="acceleratedMultiplierInput" type="number" min="1" max="120" step="1">
+          <span class="hint">Použije se v režimu Zrychlený čas.</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="retroSpeedInput">Rychlost retro animace</label>
+        <div class="range-row">
+          <input id="retroSpeedInput" type="range" min="0.5" max="2.5" step="0.1">
+          <span class="range-value" id="retroSpeedValue">0.5x</span>
+        </div>
+      </div>
+      <div class="field">
+        <label class="toggle">
+          <input id="autoZoomInput" type="checkbox">
+          <span>Automatická rotace detailu</span>
+        </label>
+        <span class="hint" id="autoZoomHint">Pasivní demo režim: postupně ukazuje detail viditelných vlaků.</span>
+      </div>
+      <div class="field">
+        <label class="toggle">
+          <input id="announcementInput" type="checkbox">
+          <span>HLÁŠENÍ</span>
+        </label>
+        <span class="hint">Při automatickém odjezdu nebo odletu se spustí české hlášení, případně textový fallback.</span>
+      </div>
+    </section>
+
+    <section class="panel active" id="boardPanel">
+      <div class="controls presentation-dim" aria-label="Ovládání tabule">
+        <div class="control-grid">
+          <div class="field">
+            <label for="stationSelect" id="locationSelectLabel">Zastávka</label>
+            <select id="stationSelect"></select>
+          </div>
+          <div class="field">
+            <span class="control-label">Typ tabule</span>
+            <div class="segmented" id="boardTypeControls">
+              <button class="segment" type="button" data-value="departure">Odjezdy</button>
+              <button class="segment" type="button" data-value="arrival">Příjezdy</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="control-label">Design</span>
+            <div class="segmented" id="designControls">
+              <button class="segment" type="button" data-value="digital">Digital</button>
+              <button class="segment" type="button" data-value="retro">Retro</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="clockModeSelect">Režim hodin</label>
+            <select id="clockModeSelect">
+              <option value="real">Reálný čas</option>
+              <option value="manual">Manuální čas</option>
+              <option value="accelerated">Zrychlený čas</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="manualTimeInput">Manuální čas</label>
+            <input id="manualTimeInput" type="time" step="60">
+          </div>
+          <div class="field">
+            <span class="control-label">Schéma</span>
+            <button class="secondary-button schema-toggle-action" type="button" id="schemaToggleMain" aria-pressed="false">Schovat</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="board-layout" id="boardLayout">
+        <section class="board-shell" aria-label="Dopravni tabule">
+          <div class="board-header" id="boardHeader">
+            <h2 class="station-name" id="stationName">-</h2>
+            <div class="board-clock" aria-live="polite">
+              <span class="clock-value" id="boardClockValue">--:--</span>
+              <span class="board-type" id="boardTypeLabel">Odjezdy</span>
+            </div>
+          </div>
+          <div id="boardContent">
+            <div class="board-headings row-grid" aria-hidden="true">
+              <div>Čas</div>
+              <div>Spoj</div>
+              <div>Směr</div>
+              <div>Kolej</div>
+              <div>Stav</div>
+              <div>Zpoždění</div>
+            </div>
+            <div class="board-rows" id="boardRows"></div>
+            <div class="empty-message" id="emptyMessage" hidden>Pro zvolený čas nejsou dostupné žádné vlaky.</div>
+          </div>
+        </section>
+        <button class="layout-resizer" type="button" id="layoutResizer" aria-label="Změnit šířku tabule a schématu"></button>
+        <aside class="movement-panel" aria-label="Animace provozu">
+          <div class="movement-title">
+            <span class="movement-title-main">
+              <button class="secondary-button schema-toggle schema-toggle-action" type="button" id="schemaToggle" title="Schovat schéma" aria-pressed="false">◱</button>
+              <span id="movementTitle">Schéma nádraží</span>
+            </span>
+            <span id="movementStatus">-</span>
+          </div>
+          <div class="movement-stage" id="movementStage"></div>
+          <div class="announcement-banner" id="announcementBanner" hidden></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel" id="entryPanel">
+      <div class="form-shell presentation-dim">
+        <form class="train-form" id="trainForm" novalidate>
+          <div class="field" data-field="type">
+            <label for="trainType" id="tripTypeLabel">Typ vlaku *</label>
+            <select id="trainType" name="type" required>
+              <option value="departure">Odjezd</option>
+              <option value="arrival">Příjezd</option>
+            </select>
+            <span class="field-error"></span>
+          </div>
+          <div class="field" data-field="stationId">
+            <label for="trainStation" id="tripLocationLabel">Zastávka *</label>
+            <select id="trainStation" name="stationId" required></select>
+            <span class="field-error"></span>
+          </div>
+          <div class="field" data-field="line">
+            <label for="trainLine" id="tripLineLabel">Linka nebo spoj *</label>
+            <input id="trainLine" name="line" maxlength="24" required placeholder="R 701">
+            <span class="field-error"></span>
+          </div>
+          <div class="field" data-field="scheduledTime">
+            <label for="trainTime">Plánovaný čas *</label>
+            <input id="trainTime" name="scheduledTime" type="time" step="60" required>
+            <span class="field-error"></span>
+          </div>
+          <div class="field train-only">
+            <label for="trainCategory">Kategorie</label>
+            <input id="trainCategory" name="trainCategory" maxlength="16" placeholder="R">
+            <span class="field-error"></span>
+          </div>
+          <div class="field wide train-only">
+            <label for="trainCarrier">Dopravce</label>
+            <input id="trainCarrier" name="carrier" maxlength="60" placeholder="České dráhy">
+            <span class="field-error"></span>
+          </div>
+          <div class="field wide airport-only">
+            <label for="flightAirline">Airline</label>
+            <input id="flightAirline" name="airline" maxlength="60" placeholder="Lufthansa">
+            <span class="field-error"></span>
+          </div>
+          <div class="field airport-only">
+            <label for="flightAircraftType">Typ letadla</label>
+            <input id="flightAircraftType" name="aircraftType" maxlength="40" placeholder="A320">
+            <span class="field-error"></span>
+          </div>
+          <div class="field airport-only">
+            <label for="flightAircraftModel">Model letadla</label>
+            <input id="flightAircraftModel" name="aircraftModel" maxlength="60" placeholder="Airbus A320neo">
+            <span class="field-error"></span>
+          </div>
+          <div class="field">
+            <label for="trainPlatform">Nástupiště nebo kolej</label>
+            <input id="trainPlatform" name="platform" maxlength="18" placeholder="3">
+            <span class="field-error"></span>
+          </div>
+          <div class="field airport-only">
+            <label for="flightTerminal">Terminal</label>
+            <input id="flightTerminal" name="terminal" maxlength="18" placeholder="T1">
+            <span class="field-error"></span>
+          </div>
+          <div class="field wide">
+            <label for="trainOrigin">Výchozí stanice</label>
+            <input id="trainOrigin" name="origin" maxlength="80" placeholder="Ostrava hl.n.">
+            <span class="field-error"></span>
+          </div>
+          <div class="field wide">
+            <label for="trainDestination">Cílová stanice</label>
+            <input id="trainDestination" name="destination" maxlength="80" placeholder="Praha hlavní nádraží">
+            <span class="field-error"></span>
+          </div>
+          <div class="field wide">
+            <label for="trainStatus">Stav</label>
+            <input id="trainStatus" name="status" maxlength="50" placeholder="Včas">
+            <span class="field-error"></span>
+          </div>
+          <div class="field" data-field="delayMinutes">
+            <label for="trainDelay">Zpoždění v minutách</label>
+            <input id="trainDelay" name="delayMinutes" inputmode="numeric" placeholder="0">
+            <span class="field-error"></span>
+          </div>
+          <div class="form-actions">
+            <button class="submit-button" type="submit" id="tripSubmitButton">Přidat vlak</button>
+            <span class="form-status" id="formStatus" role="status"></span>
+          </div>
+        </form>
+        <p class="form-note" id="entryFormNote">Uživatelsky zadané vlaky jsou lokální demo data uložená pouze v tomto prohlížeči.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="dataPanel">
+      <div class="management-grid presentation-dim">
+        <section>
+          <h2 id="locationFormTitle">Přidat zastávku</h2>
+          <form class="station-form" id="stationForm" novalidate>
+            <div class="field" data-field="stationNameInput">
+              <label for="stationNameInput" id="locationNameInputLabel">Název zastávky *</label>
+              <input id="stationNameInput" name="name" maxlength="80" required placeholder="Plzeň hlavní nádraží">
+              <span class="field-error"></span>
+            </div>
+            <div class="field" data-field="stationIdInput">
+              <label for="stationIdInput" id="locationIdInputLabel">ID zastavky</label>
+              <input id="stationIdInput" name="id" maxlength="60" placeholder="plzen-hlavni">
+              <span class="field-error"></span>
+            </div>
+            <div class="field airport-only" data-field="airportCodeInput">
+              <label for="airportCodeInput">Kod letiste</label>
+              <input id="airportCodeInput" name="code" maxlength="4" placeholder="PRG">
+              <span class="field-error"></span>
+            </div>
+            <div class="form-actions">
+              <button class="submit-button" type="submit" id="locationSubmitButton">Přidat zastávku</button>
+              <span class="form-status" id="stationStatus" role="status"></span>
+            </div>
+          </form>
+        </section>
+
+        <section>
+          <h2 id="locationListTitle">Zastavky</h2>
+          <div class="data-list" id="stationList"></div>
+        </section>
+
+        <section>
+          <h2 id="tripListTitle">Vlaky</h2>
+          <div class="data-list" id="trainList"></div>
+        </section>
+
+        <section>
+          <h2>Import / export</h2>
+          <div class="import-export">
+            <div class="field">
+              <span class="section-title">Export</span>
+              <p class="hint">Exportuje nastaveni, lokalni vlaky, zastavky, lety, letiste a skryte demo polozky.</p>
+              <button class="submit-button" type="button" id="exportButton">Exportovat JSON</button>
+            </div>
+            <div class="field">
+              <label for="importText">Import JSON</label>
+              <textarea id="importText" spellcheck="false" placeholder='{"schemaVersion":1,...}'></textarea>
+              <div class="actions">
+                <button class="submit-button" type="button" id="importButton">Importovat</button>
+                <button class="secondary-button" type="button" id="clearLocalButton">Vymazat lokalni stav</button>
+              </div>
+              <span class="form-status" id="importStatus" role="status"></span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const APP_CONFIG = {
+      stations: [
+        { id: "praha-hlavni", name: "Praha hlavní nádraží", trackLayout: { tracks: ["1", "2", "3", "4", "5", "6", "7"] } },
+        { id: "brno-hlavni", name: "Brno hlavní nádraží", trackLayout: { tracks: ["1", "2", "3", "4", "5"] } },
+        { id: "ostrava-hlavni", name: "Ostrava hlavní nádraží", trackLayout: { tracks: ["1", "2", "3", "4"] } }
+      ],
+      trains: [
+        { id: "ec-175", type: "departure", stationId: "praha-hlavni", line: "EC 175", trainCategory: "EC", carrier: "České dráhy", origin: null, destination: "Budapest-Nyugati", scheduledTime: "09:44", platform: "7", status: "Včas", delayMinutes: 0 },
+        { id: "r-701", type: "departure", stationId: "praha-hlavni", line: "R 701", trainCategory: "R", carrier: "České dráhy", origin: null, destination: "Brno hlavní nádraží", scheduledTime: "10:32", platform: "3", status: "Včas", delayMinutes: 0 },
+        { id: "sc-515", type: "departure", stationId: "praha-hlavni", line: "SC 515", trainCategory: "SC", carrier: "České dráhy", origin: null, destination: "Ostrava hl.n.", scheduledTime: "11:19", platform: "1", status: "Zpožděn", delayMinutes: 8 },
+        { id: "rx-885", type: "departure", stationId: "praha-hlavni", line: "Rx 885", trainCategory: "Rx", carrier: "RegioJet", origin: null, destination: "České Budějovice", scheduledTime: "12:06", platform: null, status: "Připraven", delayMinutes: 0 },
+        { id: "ex-358", type: "arrival", stationId: "praha-hlavni", line: "Ex 358", trainCategory: "Ex", carrier: "České dráhy", origin: "Mnichov Hbf", destination: null, scheduledTime: "10:05", platform: "5", status: "Včas", delayMinutes: 0 },
+        { id: "r-982", type: "arrival", stationId: "praha-hlavni", line: "R 982", trainCategory: "R", carrier: "Arriva vlaky", origin: "Tanvald", destination: null, scheduledTime: "10:41", platform: "2", status: "Zpožděn", delayMinutes: 12 },
+        { id: "leo-1361", type: "arrival", stationId: "praha-hlavni", line: "LE 1361", trainCategory: "LE", carrier: "Leo Express", origin: "Košice", destination: null, scheduledTime: "11:03", platform: "4", status: "Včas", delayMinutes: 0 },
+        { id: "rj-1006", type: "arrival", stationId: "praha-hlavni", line: "RJ 1006", trainCategory: "RJ", carrier: "RegioJet", origin: "Bratislava hl.st.", destination: null, scheduledTime: "12:22", platform: "6", status: "Na ceste", delayMinutes: 3 },
+        { id: "r-875", type: "departure", stationId: "brno-hlavni", line: "R 875", trainCategory: "R", carrier: "České dráhy", origin: null, destination: "Praha hlavní nádraží", scheduledTime: "09:38", platform: "2", status: "Včas", delayMinutes: 0 },
+        { id: "ec-276", type: "departure", stationId: "brno-hlavni", line: "EC 276", trainCategory: "EC", carrier: "České dráhy", origin: null, destination: "Hamburg-Altona", scheduledTime: "10:22", platform: "4", status: "Zpožděn", delayMinutes: 5 },
+        { id: "os-4612", type: "departure", stationId: "brno-hlavni", line: "Os 4612", trainCategory: "Os", carrier: "Kordis JMK", origin: null, destination: "Tišnov", scheduledTime: "10:47", platform: "5", status: "Včas", delayMinutes: 0 },
+        { id: "rj-1048", type: "arrival", stationId: "brno-hlavni", line: "RJ 1048", trainCategory: "RJ", carrier: "RegioJet", origin: "Vídeň Hbf", destination: null, scheduledTime: "09:57", platform: "1", status: "Včas", delayMinutes: 0 },
+        { id: "ex-533", type: "arrival", stationId: "brno-hlavni", line: "Ex 533", trainCategory: "Ex", carrier: "České dráhy", origin: "Praha hlavní nádraží", destination: null, scheduledTime: "10:36", platform: "3", status: "Na cestě", delayMinutes: 4 },
+        { id: "sp-1777", type: "departure", stationId: "ostrava-hlavni", line: "Sp 1777", trainCategory: "Sp", carrier: "České dráhy", origin: null, destination: "Frýdek-Místek", scheduledTime: "10:14", platform: "2", status: "Včas", delayMinutes: 0 },
+        { id: "ic-546", type: "departure", stationId: "ostrava-hlavni", line: "IC 546", trainCategory: "IC", carrier: "České dráhy", origin: null, destination: "Praha hlavní nádraží", scheduledTime: "11:07", platform: "4", status: "Připraven", delayMinutes: 0 },
+        { id: "r-1122", type: "arrival", stationId: "ostrava-hlavni", line: "R 1122", trainCategory: "R", carrier: "České dráhy", origin: "Opava východ", destination: null, scheduledTime: "10:28", platform: null, status: "Včas", delayMinutes: 0 }
+      ],
+      airports: [
+        { id: "frankfurt", name: "Frankfurt Airport", code: "FRA", terminals: ["T1", "T2", "T3"], gates: ["A18", "B24", "C7", "Z52"], runwayLayout: { runways: ["07L/25R", "07C/25C", "07R/25L", "18"] } },
+        { id: "praha-letiste", name: "Letiště Václava Havla Praha", code: "PRG", terminals: ["T1", "T2"], gates: ["A3", "B8", "C12", "D4"], runwayLayout: { runways: ["06/24", "12/30"] } }
+      ],
+      flights: [
+        { id: "lh-1394", type: "departure", airportId: "frankfurt", flightNumber: "LH 1394", airline: "Lufthansa", aircraftType: "A320", aircraftModel: "Airbus A320neo", origin: null, destination: "Praha", scheduledTime: "10:20", terminal: "T1", gate: "A18", status: "Boarding", delayMinutes: 0 },
+        { id: "ua-047", type: "departure", airportId: "frankfurt", flightNumber: "UA 047", airline: "United", aircraftType: "B748", aircraftModel: "Boeing 747-8", origin: null, destination: "Houston", scheduledTime: "11:05", terminal: "T1", gate: "Z52", status: "Final call", delayMinutes: 12 },
+        { id: "sq-326", type: "arrival", airportId: "frankfurt", flightNumber: "SQ 326", airline: "Singapore Airlines", aircraftType: "A350", aircraftModel: "Airbus A350-900", origin: "Singapore", destination: null, scheduledTime: "10:48", terminal: "T1", gate: "B24", status: "On approach", delayMinutes: 5 },
+        { id: "ok-760", type: "departure", airportId: "praha-letiste", flightNumber: "OK 760", airline: "CSA", aircraftType: "A220", aircraftModel: "Airbus A220-300", origin: null, destination: "Paříž CDG", scheduledTime: "10:15", terminal: "T2", gate: "C12", status: "Boarding", delayMinutes: 0 },
+        { id: "qs-1126", type: "departure", airportId: "praha-letiste", flightNumber: "QS 1126", airline: "Smartwings", aircraftType: "B737", aircraftModel: "Boeing 737-800", origin: null, destination: "Malaga", scheduledTime: "11:30", terminal: "T1", gate: "B8", status: "Gate open", delayMinutes: 18 },
+        { id: "lh-1402", type: "arrival", airportId: "praha-letiste", flightNumber: "LH 1402", airline: "Lufthansa", aircraftType: "A320", aircraftModel: "Airbus A320neo", origin: "Frankfurt", destination: null, scheduledTime: "10:55", terminal: "T2", gate: "D4", status: "Expected", delayMinutes: 3 }
+      ],
+      settings: {
+        defaultStationId: "praha-hlavni",
+        defaultAirportId: "frankfurt",
+        defaultMode: "train",
+        defaultBoardType: "departure",
+        defaultDesign: "digital",
+        clockMode: "manual",
+        rowCount: 8,
+        autoZoomEnabled: false,
+        autoZoomIntervalMs: 6000,
+        acceleratedTimeMultiplier: 10,
+        announcementEnabled: false,
+        airportSchemaHidden: false,
+        boardPanelSize: 70,
+        schemaPanelSize: 30,
+        retroAnimationSpeed: 0.5,
+        departureZoomMs: 10000,
+        storageKey: "train-board-settings",
+        customTrainsStorageKey: "train-board-custom-trains",
+        dataStateStorageKey: "train-board-data-state"
+      }
+    };
+
+    const VALID_BOARD_TYPES = ["departure", "arrival"];
+    const VALID_MODES = ["train", "airport"];
+    const VALID_DESIGNS = ["digital", "retro"];
+    const VALID_CLOCK_MODES = ["real", "manual", "accelerated"];
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const STATION_ROUTE_TEMPLATES = [
+      { id: "west-north", y: 26, edgeX: 8, edgeY: 18, c1x: 39, c1y: 32, c2x: 24, c2y: 20, labelX: 9, labelY: 13, direction: "Sever" },
+      { id: "west-main", y: 39, edgeX: 7, edgeY: 42, c1x: 38, c1y: 45, c2x: 22, c2y: 42, labelX: 9, labelY: 49, direction: "Zapad" },
+      { id: "east-main", y: 52, edgeX: 93, edgeY: 48, c1x: 62, c1y: 49, c2x: 78, c2y: 48, labelX: 82, labelY: 42, direction: "Vychod" },
+      { id: "east-south", y: 65, edgeX: 92, edgeY: 76, c1x: 63, c1y: 59, c2x: 76, c2y: 74, labelX: 80, labelY: 83, direction: "Jih" },
+      { id: "west-south", y: 78, edgeX: 13, edgeY: 86, c1x: 40, c1y: 63, c2x: 26, c2y: 84, labelX: 10, labelY: 92, direction: "Regional" }
+    ];
+    const FLIP_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-/ .";
+    const BASE_FLIP_ROW_DELAY_MS = 520;
+    const BASE_FLIP_CHAR_DELAY_MS = 2;
+    const BASE_FLIP_FRAME_MS = 44;
+    const BASE_FLIP_DURATION_MS = 40;
+    const FLIP_TURNS = 2;
+    const MIN_RETRO_SPEED = 0.5;
+    const MAX_RETRO_SPEED = 2.5;
+
+    const state = {
+      activeTab: "boardPanel",
+      mode: APP_CONFIG.settings.defaultMode,
+      stationId: APP_CONFIG.settings.defaultStationId,
+      airportId: APP_CONFIG.settings.defaultAirportId,
+      boardType: APP_CONFIG.settings.defaultBoardType,
+      design: APP_CONFIG.settings.defaultDesign,
+      clockMode: APP_CONFIG.settings.clockMode,
+      manualTime: "09:30",
+      autoZoomEnabled: APP_CONFIG.settings.autoZoomEnabled,
+      announcementEnabled: APP_CONFIG.settings.announcementEnabled,
+      airportSchemaHidden: APP_CONFIG.settings.airportSchemaHidden,
+      boardPanelSize: APP_CONFIG.settings.boardPanelSize,
+      schemaPanelSize: APP_CONFIG.settings.schemaPanelSize,
+      acceleratedTimeMultiplier: APP_CONFIG.settings.acceleratedTimeMultiplier,
+      playModeEnabled: false,
+      retroAnimationSpeed: APP_CONFIG.settings.retroAnimationSpeed,
+      customStations: [],
+      customTrains: [],
+      customAirports: [],
+      customFlights: [],
+      hiddenStationIds: [],
+      hiddenTrainIds: [],
+      hiddenAirportIds: [],
+      hiddenFlightIds: [],
+      visibleTrains: [],
+      selectedTrainId: null,
+      departureZoomTrainId: null,
+      autoZoomIndex: -1,
+      acceleratedStartedAt: Date.now(),
+      acceleratedBaseMinutes: null,
+      renderSignature: "",
+      animationRunId: 0,
+      animationTimers: [],
+      movementMarkerPositions: {},
+      lastAnnouncementText: ""
+    };
+
+    const els = {
+      body: document.body,
+      appTitle: document.getElementById("appTitle"),
+      appSubtitle: document.getElementById("appSubtitle"),
+      playModeToggle: document.getElementById("playModeToggle"),
+      modeControls: document.getElementById("modeControls"),
+      entryTabButton: document.getElementById("entryTabButton"),
+      settingsToggle: document.getElementById("settingsToggle"),
+      settingsPanel: document.getElementById("settingsPanel"),
+      settingsClose: document.getElementById("settingsClose"),
+      acceleratedMultiplierInput: document.getElementById("acceleratedMultiplierInput"),
+      retroSpeedInput: document.getElementById("retroSpeedInput"),
+      retroSpeedValue: document.getElementById("retroSpeedValue"),
+      stationSelect: document.getElementById("stationSelect"),
+      trainStation: document.getElementById("trainStation"),
+      boardTypeControls: document.getElementById("boardTypeControls"),
+      designControls: document.getElementById("designControls"),
+      clockModeSelect: document.getElementById("clockModeSelect"),
+      manualTimeInput: document.getElementById("manualTimeInput"),
+      autoZoomInput: document.getElementById("autoZoomInput"),
+      announcementInput: document.getElementById("announcementInput"),
+      autoZoomHint: document.getElementById("autoZoomHint"),
+      clockButton: document.getElementById("clockButton"),
+      clockValue: document.getElementById("clockValue"),
+      boardClockValue: document.getElementById("boardClockValue"),
+      clockModeLabel: document.getElementById("clockModeLabel"),
+      boardLayout: document.getElementById("boardLayout"),
+      layoutResizer: document.getElementById("layoutResizer"),
+      schemaToggleMain: document.getElementById("schemaToggleMain"),
+      schemaToggle: document.getElementById("schemaToggle"),
+      stationName: document.getElementById("stationName"),
+      boardTypeLabel: document.getElementById("boardTypeLabel"),
+      boardContent: document.getElementById("boardContent"),
+      boardRows: document.getElementById("boardRows"),
+      emptyMessage: document.getElementById("emptyMessage"),
+      locationSelectLabel: document.getElementById("locationSelectLabel"),
+      movementTitle: document.getElementById("movementTitle"),
+      movementStatus: document.getElementById("movementStatus"),
+      movementStage: document.getElementById("movementStage"),
+      announcementBanner: document.getElementById("announcementBanner"),
+      trainForm: document.getElementById("trainForm"),
+      tripTypeLabel: document.getElementById("tripTypeLabel"),
+      tripLocationLabel: document.getElementById("tripLocationLabel"),
+      tripLineLabel: document.getElementById("tripLineLabel"),
+      tripSubmitButton: document.getElementById("tripSubmitButton"),
+      entryFormNote: document.getElementById("entryFormNote"),
+      formStatus: document.getElementById("formStatus"),
+      stationForm: document.getElementById("stationForm"),
+      locationFormTitle: document.getElementById("locationFormTitle"),
+      locationNameInputLabel: document.getElementById("locationNameInputLabel"),
+      locationIdInputLabel: document.getElementById("locationIdInputLabel"),
+      locationSubmitButton: document.getElementById("locationSubmitButton"),
+      locationListTitle: document.getElementById("locationListTitle"),
+      tripListTitle: document.getElementById("tripListTitle"),
+      stationStatus: document.getElementById("stationStatus"),
+      stationList: document.getElementById("stationList"),
+      trainList: document.getElementById("trainList"),
+      exportButton: document.getElementById("exportButton"),
+      importText: document.getElementById("importText"),
+      importButton: document.getElementById("importButton"),
+      importStatus: document.getElementById("importStatus"),
+      clearLocalButton: document.getElementById("clearLocalButton")
+    };
+
+    let autoZoomTimer = null;
+    let departureZoomTimer = null;
+
+    function init() {
+      loadSettings();
+      loadDataState();
+      ensureValidStation();
+      ensureValidAirport();
+      applyRetroAnimationSpeed();
+      fillStationSelects();
+      bindEvents();
+      renderAll(true);
+      setInterval(tick, 1000);
+      restartAutoZoom();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll(".tab-button").forEach(button => {
+        button.addEventListener("click", () => switchTab(button.dataset.tab));
+      });
+
+      els.modeControls.addEventListener("click", event => {
+        const button = event.target.closest("button[data-value]");
+        if (!button) return;
+        state.mode = safeChoice(button.dataset.value, VALID_MODES, APP_CONFIG.settings.defaultMode);
+        resetRotation();
+        persistSettings();
+        renderAll(true);
+      });
+
+      els.stationSelect.addEventListener("change", () => {
+        if (state.mode === "airport") state.airportId = safeAirportId(els.stationSelect.value);
+        else state.stationId = safeStationId(els.stationSelect.value);
+        resetRotation();
+        persistSettings();
+        renderAll(true);
+      });
+
+      els.boardTypeControls.addEventListener("click", event => {
+        const button = event.target.closest("button[data-value]");
+        if (!button) return;
+        state.boardType = safeChoice(button.dataset.value, VALID_BOARD_TYPES, APP_CONFIG.settings.defaultBoardType);
+        resetRotation();
+        persistSettings();
+        renderAll(true);
+      });
+
+      els.designControls.addEventListener("click", event => {
+        const button = event.target.closest("button[data-value]");
+        if (!button) return;
+        state.design = safeChoice(button.dataset.value, VALID_DESIGNS, APP_CONFIG.settings.defaultDesign);
+        persistSettings();
+        renderAll(true);
+      });
+
+      els.clockModeSelect.addEventListener("change", () => {
+        state.clockMode = safeChoice(els.clockModeSelect.value, VALID_CLOCK_MODES, APP_CONFIG.settings.clockMode);
+        resetAcceleratedClock();
+        resetRotation();
+        persistSettings();
+        renderAll(true);
+      });
+
+      els.manualTimeInput.addEventListener("input", () => {
+        if (!isValidTime(els.manualTimeInput.value)) return;
+        state.manualTime = els.manualTimeInput.value;
+        if (state.clockMode === "manual") resetRotation();
+        persistSettings();
+        if (state.clockMode === "manual") renderWithDepartureDetection(true);
+        else renderAll(true);
+      });
+
+      els.autoZoomInput.addEventListener("change", () => {
+        state.autoZoomEnabled = els.autoZoomInput.checked;
+        resetRotation();
+        persistSettings();
+        restartAutoZoom();
+      });
+
+      els.announcementInput.addEventListener("change", () => {
+        state.announcementEnabled = els.announcementInput.checked;
+        persistSettings();
+        syncControls();
+      });
+
+      const updateAcceleratedMultiplier = () => {
+        state.acceleratedTimeMultiplier = clampAcceleratedMultiplier(els.acceleratedMultiplierInput.value);
+        resetAcceleratedClock();
+        persistSettings();
+        renderAll(true);
+      };
+      els.acceleratedMultiplierInput.addEventListener("input", updateAcceleratedMultiplier);
+      els.acceleratedMultiplierInput.addEventListener("change", updateAcceleratedMultiplier);
+
+      els.clockButton.addEventListener("click", () => {
+        openSettingsPanel("time");
+      });
+
+      els.playModeToggle.addEventListener("click", () => {
+        state.playModeEnabled = !state.playModeEnabled;
+        if (state.playModeEnabled) {
+          state.activeTab = "boardPanel";
+          state.selectedTrainId = null;
+          clearDepartureZoom();
+          switchTab("boardPanel");
+        }
+        syncControls();
+        renderAll(false);
+      });
+
+      document.querySelectorAll(".schema-toggle-action").forEach(button => {
+        button.addEventListener("click", () => {
+          state.airportSchemaHidden = !state.airportSchemaHidden;
+          persistSettings();
+          renderAll(true);
+        });
+      });
+
+      initLayoutResize();
+
+      els.settingsToggle.addEventListener("click", toggleSettingsPanel);
+      els.settingsClose.addEventListener("click", closeSettingsPanel);
+      els.retroSpeedInput.addEventListener("input", () => {
+        state.retroAnimationSpeed = clampRetroSpeed(els.retroSpeedInput.value);
+        applyRetroAnimationSpeed();
+        syncControls();
+      });
+      els.retroSpeedInput.addEventListener("change", () => {
+        persistSettings();
+        renderAll(true);
+      });
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && !els.settingsPanel.hidden) {
+          closeSettingsPanel();
+          return;
+        }
+        if (event.key === "Escape" && state.selectedTrainId) closeDetail();
+      });
+
+      els.trainForm.addEventListener("submit", handleTrainSubmit);
+      els.stationForm.addEventListener("submit", handleStationSubmit);
+      els.exportButton.addEventListener("click", exportSnapshot);
+      els.importButton.addEventListener("click", importSnapshot);
+      els.clearLocalButton.addEventListener("click", clearLocalState);
+    }
+
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      document.querySelectorAll(".tab-button").forEach(button => {
+        button.classList.toggle("active", button.dataset.tab === tabId);
+      });
+      document.querySelectorAll(".panel").forEach(panel => {
+        panel.classList.toggle("active", panel.id === tabId);
+      });
+      if (tabId === "dataPanel") renderManagement();
+    }
+
+    function tick() {
+      const before = buildVisibleSignature();
+      renderClock();
+      const after = buildVisibleSignature();
+      if (after !== before) renderWithDepartureDetection(true);
+    }
+
+    function renderAll(forceFlip) {
+      applyDesign();
+      applyRetroAnimationSpeed();
+      ensureValidStation();
+      ensureValidAirport();
+      fillStationSelects();
+      syncControls();
+      renderClock();
+      renderBoard(forceFlip);
+      renderMovementPanel();
+      renderManagement();
+      restartAutoZoom();
+    }
+
+    function applyDesign() {
+      els.body.classList.remove("design-digital", "design-retro");
+      els.body.classList.remove("mode-train", "mode-airport");
+      els.body.classList.add(`design-${state.design}`);
+      els.body.classList.add(`mode-${state.mode}`);
+    }
+
+    function syncControls() {
+      els.stationSelect.value = getActiveLocationId();
+      els.clockModeSelect.value = state.clockMode;
+      els.manualTimeInput.value = state.manualTime;
+      els.manualTimeInput.disabled = state.clockMode !== "manual";
+      els.autoZoomInput.checked = state.autoZoomEnabled;
+      els.announcementInput.checked = state.announcementEnabled;
+      els.acceleratedMultiplierInput.value = String(state.acceleratedTimeMultiplier);
+      els.retroSpeedInput.value = String(state.retroAnimationSpeed);
+      els.retroSpeedValue.textContent = `${state.retroAnimationSpeed.toFixed(1)}x`;
+      els.playModeToggle.setAttribute("aria-pressed", String(state.playModeEnabled));
+      els.playModeToggle.textContent = state.playModeEnabled ? "■" : "▶";
+      els.playModeToggle.title = state.playModeEnabled ? "Vypnout prezentační režim" : "Prezentační režim";
+      setActiveSegment(els.modeControls, state.mode);
+      setActiveSegment(els.boardTypeControls, state.boardType);
+      setActiveSegment(els.designControls, state.design);
+      applyLayoutState();
+      syncModeCopy();
+    }
+
+    function applyLayoutState() {
+      els.body.classList.toggle("play-mode", state.playModeEnabled);
+      els.boardLayout.classList.toggle("schema-hidden", state.airportSchemaHidden);
+      document.documentElement.style.setProperty("--board-panel-size", `${state.boardPanelSize}fr`);
+      document.documentElement.style.setProperty("--schema-panel-size", `${state.schemaPanelSize}fr`);
+      const text = state.airportSchemaHidden ? "Zobrazit" : "Schovat";
+      els.schemaToggleMain.textContent = text;
+      els.schemaToggleMain.setAttribute("aria-pressed", String(state.airportSchemaHidden));
+      els.schemaToggle.setAttribute("aria-pressed", String(state.airportSchemaHidden));
+      els.schemaToggle.title = state.airportSchemaHidden ? "Zobrazit schéma" : "Schovat schéma";
+    }
+
+    function syncModeCopy() {
+      const airportMode = state.mode === "airport";
+      els.appTitle.textContent = airportMode ? "Letištní tabule" : "Vlakové tabule";
+      els.appSubtitle.textContent = airportMode
+        ? "Statická demo data pro letiště, gate a pohyb letadel."
+        : "Statická demo data pro prezentaci a testování, ne aktuální jízdní řád.";
+      els.entryTabButton.textContent = airportMode ? "Zadání letu" : "Zadání vlaku";
+      els.locationSelectLabel.textContent = airportMode ? "Letiště" : "Zastávka";
+      const departureButton = els.boardTypeControls.querySelector('[data-value="departure"]');
+      const arrivalButton = els.boardTypeControls.querySelector('[data-value="arrival"]');
+      if (departureButton) departureButton.textContent = airportMode ? "Odlety" : "Odjezdy";
+      if (arrivalButton) arrivalButton.textContent = airportMode ? "Přílety" : "Příjezdy";
+      const trainTypeOptions = document.getElementById("trainType").options;
+      trainTypeOptions[0].textContent = airportMode ? "Odlet" : "Odjezd";
+      trainTypeOptions[1].textContent = airportMode ? "Přílet" : "Příjezd";
+      els.tripTypeLabel.textContent = airportMode ? "Typ letu *" : "Typ vlaku *";
+      els.tripLocationLabel.textContent = airportMode ? "Letiště *" : "Zastávka *";
+      els.tripLineLabel.textContent = airportMode ? "Let *" : "Linka nebo spoj *";
+      document.getElementById("trainLine").placeholder = airportMode ? "LH 1394" : "R 701";
+      document.getElementById("trainPlatform").previousElementSibling.textContent = airportMode ? "Gate" : "Nástupiště nebo kolej";
+      document.getElementById("trainPlatform").placeholder = airportMode ? "A18" : "3";
+      document.getElementById("trainOrigin").previousElementSibling.textContent = airportMode ? "Odkud" : "Výchozí stanice";
+      document.getElementById("trainDestination").previousElementSibling.textContent = airportMode ? "Cíl" : "Cílová stanice";
+      els.tripSubmitButton.textContent = airportMode ? "Přidat let" : "Přidat vlak";
+      els.entryFormNote.textContent = airportMode
+        ? "Uživatelsky zadané lety jsou lokální demo data uložená pouze v tomto prohlížeči."
+        : "Uživatelsky zadané vlaky jsou lokální demo data uložená pouze v tomto prohlížeči.";
+      els.autoZoomHint.textContent = airportMode
+        ? "Pasivní demo režim: postupně ukazuje detail viditelných letů."
+        : "Pasivní demo režim: postupně ukazuje detail viditelných vlaků.";
+      els.locationFormTitle.textContent = airportMode ? "Přidat letiště" : "Přidat zastávku";
+      els.locationNameInputLabel.textContent = airportMode ? "Název letiště *" : "Název zastávky *";
+      els.locationIdInputLabel.textContent = airportMode ? "ID letiště" : "ID zastávky";
+      els.locationSubmitButton.textContent = airportMode ? "Přidat letiště" : "Přidat zastávku";
+      els.locationListTitle.textContent = airportMode ? "Letiště" : "Zastávky";
+      els.tripListTitle.textContent = airportMode ? "Lety" : "Vlaky";
+    }
+
+    function toggleSettingsPanel() {
+      const willOpen = els.settingsPanel.hidden;
+      els.settingsPanel.hidden = !willOpen;
+      els.settingsToggle.setAttribute("aria-expanded", String(willOpen));
+      if (willOpen) els.retroSpeedInput.focus();
+    }
+
+    function openSettingsPanel(target) {
+      els.settingsPanel.hidden = false;
+      els.settingsToggle.setAttribute("aria-expanded", "true");
+      els.settingsPanel.classList.add("highlight");
+      window.setTimeout(() => els.settingsPanel.classList.remove("highlight"), 900);
+      if (target === "time") {
+        els.clockModeSelect.focus();
+      } else {
+        els.retroSpeedInput.focus();
+      }
+    }
+
+    function closeSettingsPanel() {
+      els.settingsPanel.hidden = true;
+      els.settingsToggle.setAttribute("aria-expanded", "false");
+      els.settingsToggle.focus();
+    }
+
+    function setActiveSegment(container, value) {
+      container.querySelectorAll(".segment").forEach(button => {
+        button.classList.toggle("active", button.dataset.value === value);
+      });
+    }
+
+    function initLayoutResize() {
+      let dragStart = null;
+      const stopDrag = () => {
+        if (!dragStart) return;
+        dragStart = null;
+        els.layoutResizer.classList.remove("dragging");
+        document.body.style.cursor = "";
+        persistSettings();
+      };
+      els.layoutResizer.addEventListener("pointerdown", event => {
+        if (state.airportSchemaHidden || window.matchMedia("(max-width: 920px)").matches) return;
+        const rect = els.boardLayout.getBoundingClientRect();
+        dragStart = { rect };
+        els.layoutResizer.setPointerCapture(event.pointerId);
+        els.layoutResizer.classList.add("dragging");
+        document.body.style.cursor = "col-resize";
+      });
+      els.layoutResizer.addEventListener("pointermove", event => {
+        if (!dragStart) return;
+        const total = Math.max(1, dragStart.rect.width);
+        const x = Math.min(Math.max(event.clientX - dragStart.rect.left, total * 0.45), total * 0.82);
+        const board = Math.round((x / total) * 100);
+        state.boardPanelSize = board;
+        state.schemaPanelSize = 100 - board;
+        applyLayoutState();
+      });
+      els.layoutResizer.addEventListener("pointerup", stopDrag);
+      els.layoutResizer.addEventListener("pointercancel", stopDrag);
+    }
+
+    function renderClock() {
+      const minutes = getReferenceMinutes();
+      const value = minutesToTime(minutes);
+      els.clockValue.textContent = value;
+      els.boardClockValue.textContent = value;
+      const labels = {
+        real: "Reálný čas",
+        manual: "Manuální čas",
+        accelerated: `Zrychlený čas ${state.acceleratedTimeMultiplier}x`
+      };
+      els.clockModeLabel.textContent = labels[state.clockMode];
+    }
+
+    function renderBoard(forceFlip) {
+      const location = getActiveLocation();
+      const referenceMinutes = getReferenceMinutes();
+      const rows = getVisibleRows(referenceMinutes);
+      const selectedTrip = state.selectedTrainId ? getTripById(state.selectedTrainId) : null;
+      const signature = [
+        rows.map(trip => trip ? `${trip.id}:${trip.scheduledTime}:${trip.delayMinutes}:${displayStatus(trip, referenceMinutes)}` : "empty").join("|"),
+        state.design,
+        state.mode,
+        state.boardType,
+        getActiveLocationId(),
+        state.selectedTrainId || "list"
+      ].join("::");
+      const shouldFlip = forceFlip || signature !== state.renderSignature;
+
+      state.visibleTrains = rows.filter(Boolean);
+      state.renderSignature = signature;
+      els.stationName.textContent = location ? location.name : (state.mode === "airport" ? "Bez letiště" : "Bez zastávky");
+      els.boardTypeLabel.textContent = state.boardType === "departure"
+        ? (state.mode === "airport" ? "Odlety" : "Odjezdy")
+        : (state.mode === "airport" ? "Přílety" : "Příjezdy");
+
+      if (selectedTrip && (state.departureZoomTrainId === selectedTrip.id || rows.some(trip => trip && trip.id === selectedTrip.id))) {
+        renderDetail(selectedTrip);
+        return;
+      }
+
+      if (state.selectedTrainId) state.selectedTrainId = null;
+      renderRows(rows, shouldFlip);
+    }
+
+    function renderRows(rows, shouldFlip) {
+      const headings = state.mode === "airport"
+        ? ["Čas", "Let", "Směr", "Gate", "Stav", "Zpoždění"]
+        : ["Čas", "Spoj", "Směr", "Kolej", "Stav", "Zpoždění"];
+      els.boardContent.innerHTML = `
+        <div class="board-headings row-grid" aria-hidden="true">
+          ${headings.map(heading => `<div>${heading}</div>`).join("")}
+        </div>
+        <div class="board-rows" id="boardRows"></div>
+        <div class="empty-message" id="emptyMessage" ${state.visibleTrains.length > 0 ? "hidden" : ""}>Pro zvolený čas nejsou dostupné žádné ${state.mode === "airport" ? "lety" : "vlaky"}.</div>
+      `;
+      els.boardRows = document.getElementById("boardRows");
+      els.emptyMessage = document.getElementById("emptyMessage");
+      clearAnimationTimers();
+
+      rows.forEach((trip, index) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = `train-row row-grid${trip ? "" : " empty"}`;
+        row.dataset.index = String(index);
+        row.disabled = !trip;
+
+        if (trip) {
+          row.setAttribute("aria-label", `${tripLabel(trip)}, ${displayDirection(trip)}, ${trip.scheduledTime}`);
+          row.addEventListener("click", () => openDetail(trip));
+          appendTripCells(row, trip, shouldFlip, getReferenceMinutes());
+        } else {
+          row.setAttribute("aria-hidden", "true");
+          appendEmptyCells(row, false);
+        }
+
+        els.boardRows.appendChild(row);
+        animateRetroRow(row, Boolean(trip) && shouldFlip, index);
+      });
+    }
+
+    function renderDetail(train) {
+      clearAnimationTimers();
+      const delayed = addMinutes(train.scheduledTime, train.delayMinutes || 0);
+      const items = state.mode === "airport"
+        ? [
+          ["Let", train.flightNumber],
+          ["Airline", train.airline || "-"],
+          [train.type === "departure" ? "Cíl" : "Odkud", displayDirection(train)],
+          ["Plánovaný čas", train.scheduledTime],
+          ["Odhadovaný čas", train.delayMinutes > 0 ? delayed : "Bez zpoždění"],
+          ["Terminal / gate", `${train.terminal || "-"} / ${train.gate || "-"}`],
+          ["Letadlo", [train.aircraftType, train.aircraftModel].filter(Boolean).join(" - ") || "-"],
+          ["Stav", displayStatus(train, getReferenceMinutes())],
+          ["Zpoždění", train.delayMinutes > 0 ? `${train.delayMinutes} min` : "0 min"]
+        ]
+        : [
+          ["Spoj", train.line],
+          ["Typ vlaku", train.trainCategory || "-"],
+          [train.type === "departure" ? "Směr" : "Odkud", displayDirection(train)],
+          ["Plánovaný čas", train.scheduledTime],
+          ["Odhadovaný čas", train.delayMinutes > 0 ? delayed : "Bez zpoždění"],
+          ["Nástupiště / kolej", train.platform || "-"],
+          ["Stav", displayStatus(train, getReferenceMinutes())],
+          ["Zpoždění", train.delayMinutes > 0 ? `${train.delayMinutes} min` : "0 min"],
+          ["Dopravce", train.carrier || "-"]
+        ];
+      if (state.design === "retro") {
+        renderRetroDetail(train, items);
+      } else {
+        els.boardContent.innerHTML = `
+          <div class="detail-header">
+            <h3 class="detail-title">${escapeHtml(tripLabel(train))} ${escapeHtml(displayDirection(train))}</h3>
+            <div class="detail-actions">
+              <button class="secondary-button" type="button" id="announceInlineDetail">Pustit hlášení</button>
+              <button class="secondary-button" type="button" id="closeInlineDetail">Zpět na tabuli</button>
+            </div>
+          </div>
+          <div class="board-detail">
+            <div class="detail-grid">
+              ${items.map(([label, value]) => `
+                <div class="detail-item">
+                  <span>${escapeHtml(label)}</span>
+                  <strong>${escapeHtml(value)}</strong>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+      document.getElementById("announceInlineDetail").addEventListener("click", () => announceTrip(train, true));
+      document.getElementById("closeInlineDetail").addEventListener("click", closeDetail);
+      document.getElementById("closeInlineDetail").focus();
+    }
+
+    function renderRetroDetail(train, items) {
+      els.boardContent.innerHTML = "";
+
+      const header = document.createElement("div");
+      header.className = "detail-header";
+
+      const title = document.createElement("h3");
+      title.className = "detail-title";
+      title.textContent = `${tripLabel(train)} ${displayDirection(train)}`;
+
+      const closeButton = document.createElement("button");
+      closeButton.className = "secondary-button";
+      closeButton.type = "button";
+      closeButton.id = "closeInlineDetail";
+      closeButton.textContent = "Zpět na tabuli";
+
+      const announceButton = document.createElement("button");
+      announceButton.className = "secondary-button";
+      announceButton.type = "button";
+      announceButton.id = "announceInlineDetail";
+      announceButton.textContent = "Pustit hlášení";
+
+      const actions = document.createElement("div");
+      actions.className = "detail-actions";
+      actions.append(announceButton, closeButton);
+
+      header.append(title, actions);
+
+      const detail = document.createElement("div");
+      detail.className = "board-detail";
+
+      const grid = document.createElement("div");
+      grid.className = "retro-detail-grid";
+
+      items.forEach(([label, value]) => {
+        const row = document.createElement("div");
+        row.className = "retro-detail-row";
+        row.append(
+          createCell(label, "label-cell", 15, false),
+          createCell(value, "value-cell", 34, false)
+        );
+        grid.appendChild(row);
+      });
+
+      detail.appendChild(grid);
+      els.boardContent.append(header, detail);
+    }
+
+    function appendTripCells(row, train, shouldFlip, referenceMinutes) {
+      const values = [
+        { text: train.scheduledTime, className: "time-cell", length: 5 },
+        { text: tripLabel(train), className: "line-cell", length: 9 },
+        { text: displayDirection(train), className: "direction-cell", length: 23 },
+        { text: state.mode === "airport" ? (train.gate || "-") : (train.platform || "-"), className: "platform-cell", length: 5 },
+        { text: displayStatus(train, referenceMinutes), className: "status-cell", length: 16 },
+        { text: delayText(train), className: `delay-cell delay ${train.delayMinutes > 0 ? "positive" : "neutral"}`, length: 7 }
+      ];
+      values.forEach(value => row.appendChild(createCell(value.text, value.className, value.length, shouldFlip)));
+    }
+
+    function appendEmptyCells(row, shouldFlip) {
+      [
+        { text: "--:--", className: "time-cell", length: 5 },
+        { text: "-", className: "line-cell", length: 9 },
+        { text: " ", className: "direction-cell", length: 23 },
+        { text: "-", className: "platform-cell", length: 5 },
+        { text: "-", className: "status-cell", length: 16 },
+        { text: "-", className: "delay-cell", length: 7 }
+      ].forEach(value => row.appendChild(createCell(value.text, value.className, value.length, shouldFlip)));
+    }
+
+    function createCell(text, className, length, shouldFlip) {
+      const cell = document.createElement("span");
+      cell.className = `cell ${className}`;
+      cell.title = text;
+      if (state.design !== "retro") {
+        cell.textContent = text;
+        return cell;
+      }
+
+      const normalized = String(text || " ").padEnd(length, " ").slice(0, length);
+      Array.from(normalized).forEach((char, charIndex) => {
+        const flap = document.createElement("span");
+        flap.className = "flap-char";
+        flap.textContent = shouldFlip ? " " : char;
+        flap.dataset.final = char;
+        cell.appendChild(flap);
+      });
+      return cell;
+    }
+
+    function animateRetroRow(row, shouldFlip, rowIndex) {
+      if (!shouldFlip || state.design !== "retro") return;
+      const flaps = Array.from(row.querySelectorAll(".flap-char"));
+      if (!flaps.length) return;
+      const runId = state.animationRunId;
+      const timer = window.setTimeout(() => {
+        if (runId !== state.animationRunId) return;
+        flaps.forEach((flap, charIndex) => animateFlap(flap, runId, charIndex));
+      }, rowIndex * animationMs(BASE_FLIP_ROW_DELAY_MS));
+      state.animationTimers.push(timer);
+    }
+
+    function animateFlap(flap, runId, charIndex) {
+      const finalChar = flap.dataset.final;
+      const delay = charIndex * animationMs(BASE_FLIP_CHAR_DELAY_MS);
+      const timer = window.setTimeout(() => {
+        if (runId !== state.animationRunId) return;
+        let count = 0;
+        const interval = window.setInterval(() => {
+          if (runId !== state.animationRunId) {
+            window.clearInterval(interval);
+            return;
+          }
+          flap.classList.remove("flip");
+          void flap.offsetWidth;
+          flap.classList.add("flip");
+          flap.textContent = count < FLIP_TURNS ? FLIP_CHARS[Math.floor(Math.random() * FLIP_CHARS.length)] : finalChar;
+          count += 1;
+          if (count > FLIP_TURNS) {
+            window.clearInterval(interval);
+            const cleanupTimer = window.setTimeout(() => {
+              if (runId === state.animationRunId) flap.classList.remove("flip");
+            }, 90);
+            state.animationTimers.push(cleanupTimer);
+          }
+        }, animationMs(BASE_FLIP_FRAME_MS));
+        state.animationTimers.push(interval);
+      }, delay);
+      state.animationTimers.push(timer);
+    }
+
+    function animationMs(baseMs) {
+      return Math.max(1, Math.round(baseMs / state.retroAnimationSpeed));
+    }
+
+    function applyRetroAnimationSpeed() {
+      state.retroAnimationSpeed = clampRetroSpeed(state.retroAnimationSpeed);
+      document.documentElement.style.setProperty("--flip-duration", `${animationMs(BASE_FLIP_DURATION_MS)}ms`);
+    }
+
+    function clampRetroSpeed(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return APP_CONFIG.settings.retroAnimationSpeed;
+      return Math.min(MAX_RETRO_SPEED, Math.max(MIN_RETRO_SPEED, Math.round(numeric * 10) / 10));
+    }
+
+    function clampAcceleratedMultiplier(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return APP_CONFIG.settings.acceleratedTimeMultiplier;
+      return Math.min(120, Math.max(1, Math.round(numeric)));
+    }
+
+    function clampPanelSize(value, min, max) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return min;
+      return Math.min(max, Math.max(min, Math.round(numeric)));
+    }
+
+    function normalizePanelSizes() {
+      const total = state.boardPanelSize + state.schemaPanelSize;
+      if (!Number.isFinite(total) || total <= 0) {
+        state.boardPanelSize = APP_CONFIG.settings.boardPanelSize;
+        state.schemaPanelSize = APP_CONFIG.settings.schemaPanelSize;
+        return;
+      }
+      state.boardPanelSize = clampPanelSize((state.boardPanelSize / total) * 100, 45, 82);
+      state.schemaPanelSize = 100 - state.boardPanelSize;
+    }
+
+    function clearAnimationTimers() {
+      state.animationRunId += 1;
+      state.animationTimers.forEach(timer => {
+        window.clearTimeout(timer);
+        window.clearInterval(timer);
+      });
+      state.animationTimers = [];
+    }
+
+    function renderMovementPanel() {
+      const location = getActiveLocation();
+      const referenceMinutes = getReferenceMinutes();
+      els.movementTitle.textContent = state.mode === "airport" ? "Schéma letiště" : "Schéma nádraží";
+      els.movementStatus.textContent = location ? (state.mode === "airport" ? (location.code || location.id) : location.name) : "-";
+      els.movementStage.innerHTML = "";
+      if (state.mode === "airport") renderAirportMovement(location, referenceMinutes);
+      else renderStationMovement(location, referenceMinutes);
+    }
+
+    function renderStationMovement(station, referenceMinutes) {
+      const tracks = (station && station.trackLayout && Array.isArray(station.trackLayout.tracks) && station.trackLayout.tracks.length)
+        ? station.trackLayout.tracks
+        : ["1", "2", "3", "4"];
+      const trains = state.visibleTrains.slice(0, Math.min(5, state.visibleTrains.length));
+      const routes = buildStationRoutes(tracks, trains);
+      const assignments = trains.map((train, index) => ({
+        train,
+        route: stationRouteForTrain(train, routes, tracks, index)
+      }));
+      const activeRouteIds = new Set(assignments.map(item => item.route.id));
+
+      const svg = createSvgElement("svg", {
+        class: "station-minimap-svg",
+        viewBox: "0 0 100 100",
+        role: "img",
+        "aria-label": "Schematická mapa kolejí a aktuální polohy vlaků",
+        preserveAspectRatio: "xMidYMid meet"
+      });
+
+      [20, 40, 60, 80].forEach(value => {
+        svg.appendChild(createSvgElement("line", { class: "station-map-grid", x1: value, y1: 10, x2: value, y2: 92 }));
+        svg.appendChild(createSvgElement("line", { class: "station-map-grid", x1: 6, y1: value, x2: 94, y2: value }));
+      });
+
+      routes.forEach(route => {
+        route.pathElement = createSvgElement("path", {
+          class: `station-rail${activeRouteIds.has(route.id) ? " active" : ""}`,
+          d: route.d
+        });
+        svg.appendChild(route.pathElement);
+      });
+
+      svg.appendChild(createSvgElement("line", { class: "station-rail", x1: 50, y1: 22, x2: 50, y2: 82 }));
+      svg.appendChild(createSvgElement("rect", { class: "station-hub", x: 43, y: 45, width: 14, height: 14, rx: 2.4 }));
+      svg.appendChild(createSvgElement("circle", { class: "station-hub-core", cx: 50, cy: 52, r: 2.2 }));
+      svg.appendChild(createSvgText("Platformy", 42, 42, "direction-label"));
+
+      routes.forEach(route => {
+        const isActive = activeRouteIds.has(route.id);
+        svg.appendChild(createSvgElement("circle", {
+          class: `platform-node${isActive ? " active" : ""}`,
+          cx: route.platformX,
+          cy: route.platformY,
+          r: 2.4
+        }));
+        svg.appendChild(createSvgText(route.platformLabel, route.labelX, route.platformY + 1.2, `platform-label${isActive ? " active" : ""}`));
+        svg.appendChild(createSvgText(route.direction, route.directionX, route.directionY, "direction-label"));
+      });
+
+      const nextPositions = {};
+      assignments.forEach(({ train, route }) => {
+        const rawProgress = tripProgress(train, referenceMinutes);
+        const pathProgress = train.type === "arrival" ? 1 - rawProgress : rawProgress;
+        const point = stationPointOnRoute(route, pathProgress);
+        const previous = state.movementMarkerPositions[train.id] || point;
+        nextPositions[train.id] = point;
+        svg.appendChild(createStationTrainMarker(train, previous, point));
+      });
+      state.movementMarkerPositions = nextPositions;
+      els.movementStage.appendChild(svg);
+    }
+
+    function buildStationRoutes(tracks, trains) {
+      const visiblePlatforms = trains.map(train => nullableText(train.platform)).filter(Boolean);
+      const labels = unique(visiblePlatforms.concat(tracks.map(track => String(track)))).slice(0, 5);
+      while (labels.length < 3) labels.push(String(labels.length + 1));
+      return labels.map((label, index) => {
+        const template = STATION_ROUTE_TEMPLATES[index % STATION_ROUTE_TEMPLATES.length];
+        return {
+          id: `${template.id}-${label}`,
+          platform: label,
+          platformLabel: `K${label}`,
+          platformX: 50,
+          platformY: template.y,
+          labelX: 53.8,
+          directionX: template.labelX,
+          directionY: template.labelY,
+          direction: template.direction,
+          d: `M 50 ${template.y} C ${template.c1x} ${template.c1y}, ${template.c2x} ${template.c2y}, ${template.edgeX} ${template.edgeY}`
+        };
+      });
+    }
+
+    function stationRouteForTrain(train, routes, tracks, index) {
+      const platform = nullableText(train.platform);
+      if (platform) {
+        const direct = routes.find(route => route.platform === platform);
+        if (direct) return direct;
+        const trackIndex = tracks.map(track => String(track)).indexOf(platform);
+        if (trackIndex >= 0) return routes[trackIndex % routes.length];
+        return routes[hashString(platform) % routes.length];
+      }
+      return routes[index % routes.length];
+    }
+
+    function stationPointOnRoute(route, progress) {
+      const length = route.pathElement.getTotalLength();
+      const point = route.pathElement.getPointAtLength(length * Math.max(0, Math.min(1, progress)));
+      return { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+    }
+
+    function createStationTrainMarker(train, previous, point) {
+      const marker = createSvgElement("g", {
+        class: `station-train-marker ${train.type}`,
+        transform: `translate(${point.x} ${point.y})`
+      });
+      marker.appendChild(createSvgElement("title", {})).textContent = `${tripLabel(train)} ${displayDirection(train)}`;
+      marker.appendChild(createSvgElement("rect", { x: -5.6, y: -3.1, width: 11.2, height: 6.2, rx: 1.5 }));
+      marker.appendChild(createSvgText(shortTripCode(train), 0, 0.1, ""));
+
+      if (!prefersReducedMotion() && (previous.x !== point.x || previous.y !== point.y)) {
+        marker.setAttribute("transform", `translate(${previous.x} ${previous.y})`);
+        marker.appendChild(createSvgElement("animateTransform", {
+          attributeName: "transform",
+          type: "translate",
+          from: `${previous.x} ${previous.y}`,
+          to: `${point.x} ${point.y}`,
+          dur: "900ms",
+          fill: "freeze",
+          calcMode: "spline",
+          keySplines: "0.25 0.1 0.25 1"
+        }));
+      }
+      return marker;
+    }
+
+    function createSvgElement(name, attributes) {
+      const element = document.createElementNS(SVG_NS, name);
+      Object.entries(attributes || {}).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) element.setAttribute(key, String(value));
+      });
+      return element;
+    }
+
+    function createSvgText(text, x, y, className) {
+      const element = createSvgElement("text", { x, y, class: className });
+      element.textContent = text;
+      return element;
+    }
+
+    function shortTripCode(train) {
+      return tripLabel(train).replace(/\s+/g, "").slice(0, 5).toUpperCase();
+    }
+
+    function hashString(value) {
+      return String(value).split("").reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) >>> 0, 0);
+    }
+
+    function prefersReducedMotion() {
+      return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+
+    function renderAirportMovement(airport, referenceMinutes) {
+      const gates = airport && Array.isArray(airport.gates) && airport.gates.length ? airport.gates : ["A1", "B2", "C3"];
+      const template = getAirportMapTemplate(airport, gates);
+      const flights = state.visibleTrains.slice(0, Math.min(5, state.visibleTrains.length));
+      const gatePositions = template.gates;
+      const activeGateIds = new Set(flights.map((flight, index) => flight.gate || gates[index % gates.length]));
+
+      const svg = createSvgElement("svg", {
+        class: "station-minimap-svg",
+        viewBox: "0 0 100 100",
+        role: "img",
+        "aria-label": "Schematická mapa letiště, gate, pojížděcích drah a aktuální polohy letů",
+        preserveAspectRatio: "xMidYMid meet"
+      });
+
+      template.grid.forEach(value => {
+        svg.appendChild(createSvgElement("line", { class: "station-map-grid", x1: value, y1: 8, x2: value, y2: 94 }));
+        svg.appendChild(createSvgElement("line", { class: "station-map-grid", x1: 6, y1: value, x2: 94, y2: value }));
+      });
+
+      template.aprons.forEach(apron => {
+        svg.appendChild(createSvgElement("rect", { class: "airport-apron", x: apron.x, y: apron.y, width: apron.width, height: apron.height, rx: apron.rx || 3 }));
+      });
+      template.terminals.forEach(terminal => {
+        svg.appendChild(createSvgElement("rect", { class: "airport-terminal", x: terminal.x, y: terminal.y, width: terminal.width, height: terminal.height, rx: terminal.rx || 2.4 }));
+        svg.appendChild(createSvgElement("rect", { class: "airport-terminal-core", x: terminal.x + 3, y: terminal.y + terminal.height / 2 - 1.8, width: Math.max(8, terminal.width - 6), height: 3.6, rx: 1.1 }));
+        svg.appendChild(createSvgText(terminal.label, terminal.x + 2, terminal.y + terminal.height + 5, "direction-label"));
+      });
+
+      gatePositions.forEach(position => {
+        const active = activeGateIds.has(position.gate);
+        svg.appendChild(createSvgElement("line", {
+          class: `airport-taxiway connector${active ? " active" : ""}`,
+          x1: position.x - 2.8,
+          y1: position.y,
+          x2: position.x + 2.8,
+          y2: position.y
+        }));
+        svg.appendChild(createSvgText(position.gate, position.x - 3.4, position.y - 3.6, `airport-label${active ? " active" : ""}`));
+      });
+
+      template.runways.forEach(runway => {
+        svg.appendChild(createSvgElement("rect", {
+          class: "airport-runway",
+          x: runway.x,
+          y: runway.y,
+          width: runway.width,
+          height: runway.height,
+          rx: 2.2,
+          transform: runway.rotate ? `rotate(${runway.rotate} ${runway.x + runway.width / 2} ${runway.y + runway.height / 2})` : null
+        }));
+        const center = runway.y + runway.height / 2;
+        svg.appendChild(createSvgElement("line", {
+          class: "airport-runway-center",
+          x1: runway.x + 4,
+          y1: center,
+          x2: runway.x + runway.width - 4,
+          y2: center,
+          transform: runway.rotate ? `rotate(${runway.rotate} ${runway.x + runway.width / 2} ${center})` : null
+        }));
+        svg.appendChild(createSvgText(runway.label, runway.labelX, runway.labelY, "direction-label"));
+      });
+
+      const routeEntries = flights.map((flight, index) => {
+        const gate = flight.gate || gates[index % gates.length];
+        const gatePoint = gatePositions.find(position => position.gate === gate) || gatePositions[index % gatePositions.length];
+        const runway = template.runways[index % template.runways.length];
+        const runwayPoint = runway.routePoints[index % runway.routePoints.length];
+        const route = {
+          id: `${flight.id}-${gatePoint.gate}`,
+          gate: gatePoint.gate,
+          runwayX: flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2,
+          runwayY: flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2,
+          angle: runway.angle,
+          d: `M ${gatePoint.x} ${gatePoint.y} C ${template.routeHub.x} ${template.routeHub.y}, ${runwayPoint.cx} ${runwayPoint.cy}, ${flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2} ${flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2}`
+        };
+        route.pathElement = createSvgElement("path", { class: "airport-route active", d: route.d });
+        svg.appendChild(route.pathElement);
+        return { flight, route };
+      });
+
+      const nextPositions = {};
+      routeEntries.forEach(({ flight, route }) => {
+        const progress = tripProgress(flight, referenceMinutes);
+        const pathProgress = flight.type === "arrival" ? 1 - progress : progress;
+        const point = airportPointOnRoute(route, pathProgress);
+        const previous = state.movementMarkerPositions[flight.id] || point;
+        nextPositions[flight.id] = point;
+        svg.appendChild(createAirportPlaneMarker(flight, previous, point, route.angle));
+      });
+      state.movementMarkerPositions = nextPositions;
+      els.movementStage.appendChild(svg);
+    }
+
+    function buildAirportGatePositions(gates) {
+      return gates.map((gate, index) => ({
+        gate,
+        x: 18 + (index % 4) * 10,
+        y: 13 + Math.floor(index / 4) * 12
+      }));
+    }
+
+    function getAirportMapTemplate(airport, gates) {
+      if (airport && airport.id === "frankfurt") {
+        return {
+          grid: [20, 40, 60, 80],
+          aprons: [
+            { x: 19, y: 25, width: 45, height: 20 },
+            { x: 61, y: 28, width: 18, height: 15 },
+            { x: 44, y: 51, width: 20, height: 10 }
+          ],
+          terminals: [
+            { x: 22, y: 30, width: 29, height: 10, label: "T1 A/B/Z" },
+            { x: 64, y: 31, width: 12, height: 9, label: "T2 D/E" },
+            { x: 48, y: 53, width: 12, height: 7, label: "T3" }
+          ],
+          gates: [
+            { gate: "A18", x: 24, y: 25 },
+            { gate: "B24", x: 38, y: 25 },
+            { gate: "C7", x: 56, y: 44 },
+            { gate: "Z52", x: 48, y: 26 }
+          ].concat(buildAirportGatePositions(gates).filter(position => !["A18", "B24", "C7", "Z52"].includes(position.gate))),
+          runways: [
+            { label: "07L/25R", x: 11, y: 12, width: 78, height: 5.4, labelX: 13, labelY: 10, angle: 0, routePoints: [{ x1: 15, y1: 14.7, x2: 85, y2: 14.7, cx: 47, cy: 23 }] },
+            { label: "07C/25C", x: 10, y: 68, width: 78, height: 5.8, labelX: 12, labelY: 66, angle: 0, routePoints: [{ x1: 15, y1: 70.9, x2: 84, y2: 70.9, cx: 55, cy: 57 }] },
+            { label: "07R/25L", x: 10, y: 84, width: 78, height: 5.8, labelX: 12, labelY: 82, angle: 0, routePoints: [{ x1: 15, y1: 86.9, x2: 84, y2: 86.9, cx: 55, cy: 73 }] },
+            { label: "18", x: 10, y: 36, width: 6, height: 45, labelX: 18, labelY: 41, angle: 90, routePoints: [{ x1: 13, y1: 40, x2: 13, y2: 78, cx: 24, cy: 55 }] }
+          ],
+          routeHub: { x: 51, y: 50 }
+        };
+      }
+
+      if (airport && airport.id === "praha-letiste") {
+        return {
+          grid: [20, 40, 60, 80],
+          aprons: [
+            { x: 18, y: 27, width: 42, height: 24 },
+            { x: 36, y: 16, width: 26, height: 18 }
+          ],
+          terminals: [
+            { x: 22, y: 35, width: 17, height: 10, label: "T1 A/B" },
+            { x: 42, y: 24, width: 16, height: 10, label: "T2 C/D" }
+          ],
+          gates: [
+            { gate: "A3", x: 23, y: 32 },
+            { gate: "B8", x: 33, y: 49 },
+            { gate: "C12", x: 48, y: 20 },
+            { gate: "D4", x: 59, y: 35 }
+          ].concat(buildAirportGatePositions(gates).filter(position => !["A3", "B8", "C12", "D4"].includes(position.gate))),
+          runways: [
+            { label: "06/24", x: 12, y: 69, width: 76, height: 6.2, labelX: 14, labelY: 66, angle: 0, routePoints: [{ x1: 16, y1: 72.1, x2: 85, y2: 72.1, cx: 61, cy: 58 }] },
+            { label: "12/30", x: 17, y: 75, width: 68, height: 5.8, labelX: 20, labelY: 91, angle: -28, routePoints: [{ x1: 24, y1: 88, x2: 80, y2: 62, cx: 53, cy: 68 }] }
+          ],
+          routeHub: { x: 52, y: 55 }
+        };
+      }
+
+      return {
+        grid: [20, 40, 60, 80],
+        aprons: [{ x: 10, y: 11, width: 49, height: 38 }],
+        terminals: [{ x: 13, y: 17, width: 34, height: 22, label: "Terminal" }],
+        gates: buildAirportGatePositions(gates),
+        runways: [
+          { label: airport && airport.runwayLayout && Array.isArray(airport.runwayLayout.runways) && airport.runwayLayout.runways[0] ? airport.runwayLayout.runways[0] : "RWY", x: 14, y: 70, width: 72, height: 6.8, labelX: 16, labelY: 66, angle: 0, routePoints: [{ x1: 18, y1: 73.4, x2: 82, y2: 73.4, cx: 62, cy: 60 }] }
+        ],
+        routeHub: { x: 58, y: 52 }
+      };
+    }
+
+    function airportPointOnRoute(route, progress) {
+      const length = route.pathElement.getTotalLength();
+      const point = route.pathElement.getPointAtLength(length * Math.max(0, Math.min(1, progress)));
+      return { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+    }
+
+    function createAirportPlaneMarker(flight, previous, point, routeAngle) {
+      const alert = Number(flight.delayMinutes || 0) >= 45 || /cancel|alert|divert/i.test(flight.status || "");
+      const angle = (flight.type === "arrival" ? routeAngle + 180 : routeAngle) || 0;
+      const marker = createSvgElement("g", {
+        class: `airport-plane-marker ${flight.type}${alert ? " alert" : ""}`,
+        transform: `translate(${point.x} ${point.y})`
+      });
+      marker.appendChild(createSvgElement("title", {})).textContent = `${tripLabel(flight)} ${displayDirection(flight)}`;
+      const icon = createSvgElement("g", { transform: `rotate(${angle}) scale(0.75)` });
+      icon.appendChild(createSvgElement("path", {
+        class: "plane-icon",
+        d: "M -4.6 0.15 L -1.2 -0.3 L 0.7 -3.9 L 1.5 -3.9 L 0.7 0.0 L 4.7 0.0 L 5.1 0.5 L 0.7 1.0 L 1.5 4.8 L 0.7 4.8 L -1.2 1.15 L -4.6 0.7 Z"
+      }));
+      getAircraftEngineOffsets(flight).forEach(([x, y]) => {
+        icon.appendChild(createSvgElement("circle", {
+          class: "plane-icon",
+          cx: x,
+          cy: y,
+          r: 0.55
+        }));
+      });
+      marker.appendChild(icon);
+      marker.appendChild(createSvgText(shortTripCode(flight), 0, 10.0, ""));
+
+      if (!prefersReducedMotion() && (previous.x !== point.x || previous.y !== point.y)) {
+        marker.setAttribute("transform", `translate(${previous.x} ${previous.y})`);
+        marker.appendChild(createSvgElement("animateTransform", {
+          attributeName: "transform",
+          type: "translate",
+          from: `${previous.x} ${previous.y}`,
+          to: `${point.x} ${point.y}`,
+          dur: "900ms",
+          fill: "freeze",
+          calcMode: "spline",
+          keySplines: "0.25 0.1 0.25 1"
+        }));
+      }
+      return marker;
+    }
+
+    function getAircraftEngineOffsets(flight) {
+      const engines = getAircraftEngineCount(flight);
+      if (engines >= 4) return [[-0.8, -2.1], [0.25, -2.6], [-0.8, 2.1], [0.25, 2.6]];
+      return [[-0.6, -2.25], [-0.6, 2.25]];
+    }
+
+    function getAircraftEngineCount(flight) {
+      const model = `${flight.aircraftType || ""} ${flight.aircraftModel || ""}`.toUpperCase();
+      if (/\b(747|A340|A380|IL-96|AN-124|AN-225)\b/.test(model)) return 4;
+      return 2;
+    }
+
+    function tripProgress(trip, referenceMinutes) {
+      const effective = effectiveTimeToMinutes(trip);
+      const windowStart = effective - 20;
+      const windowEnd = effective + (trip.type === "departure" ? 8 : 5);
+      if (referenceMinutes <= windowStart) return trip.type === "arrival" ? 0 : 0.08;
+      if (referenceMinutes >= windowEnd) return trip.type === "arrival" ? 0.92 : 1;
+      return Math.max(0, Math.min(1, (referenceMinutes - windowStart) / Math.max(1, windowEnd - windowStart)));
+    }
+
+    function getVisibleRows(referenceMinutes) {
+      const selected = getEffectiveTrips()
+        .filter(isValidTrip)
+        .filter(train => (state.mode === "airport" ? train.airportId === state.airportId : train.stationId === state.stationId))
+        .filter(train => train.type === state.boardType)
+        .filter(train => train.type === "departure"
+          ? departureVisibleUntil(train) > referenceMinutes
+          : effectiveTimeToMinutes(train) >= referenceMinutes)
+        .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b))
+        .slice(0, APP_CONFIG.settings.rowCount);
+
+      while (selected.length < APP_CONFIG.settings.rowCount) selected.push(null);
+      return selected;
+    }
+
+    function buildVisibleSignature() {
+      const referenceMinutes = getReferenceMinutes();
+      return getVisibleRows(referenceMinutes)
+        .filter(Boolean)
+        .map(train => `${train.id}:${displayStatus(train, referenceMinutes)}`)
+        .join("|");
+    }
+
+    function renderWithDepartureDetection(forceFlip) {
+      const previousTrains = state.visibleTrains.slice();
+      const referenceMinutes = getReferenceMinutes();
+      const nextRows = getVisibleRows(referenceMinutes);
+      const departingTrain = findDepartingTrain(previousTrains, nextRows, referenceMinutes);
+      renderAll(forceFlip);
+      if (departingTrain) openDepartureZoom(departingTrain);
+    }
+
+    function findDepartingTrain(previousTrains, nextRows, referenceMinutes) {
+      if (state.boardType !== "departure") return null;
+      const nextIds = new Set(nextRows.filter(Boolean).map(train => train.id));
+      return previousTrains.find(train => (
+        train &&
+        train.type === "departure" &&
+        !nextIds.has(train.id) &&
+        departureVisibleUntil(train) <= referenceMinutes
+      )) || null;
+    }
+
+    function getReferenceMinutes() {
+      if (state.clockMode === "manual") return timeToMinutes(state.manualTime);
+      if (state.clockMode === "accelerated") {
+        if (state.acceleratedBaseMinutes === null) resetAcceleratedClock();
+        const elapsed = (Date.now() - state.acceleratedStartedAt) / 60000;
+        return Math.floor((state.acceleratedBaseMinutes + elapsed * state.acceleratedTimeMultiplier) % 1440);
+      }
+      const now = new Date();
+      return now.getHours() * 60 + now.getMinutes();
+    }
+
+    function resetAcceleratedClock() {
+      state.acceleratedStartedAt = Date.now();
+      state.acceleratedBaseMinutes = state.clockMode === "accelerated" ? timeToMinutes(state.manualTime) : null;
+    }
+
+    function openDetail(train) {
+      clearDepartureZoom();
+      state.selectedTrainId = train.id;
+      renderAll(false);
+    }
+
+    function closeDetail() {
+      clearDepartureZoom();
+      state.selectedTrainId = null;
+      renderAll(true);
+    }
+
+    function openDepartureZoom(train) {
+      window.clearTimeout(departureZoomTimer);
+      state.departureZoomTrainId = train.id;
+      state.selectedTrainId = train.id;
+      renderAll(false);
+      announceTrip(train);
+      departureZoomTimer = window.setTimeout(() => {
+        if (state.departureZoomTrainId !== train.id) return;
+        state.departureZoomTrainId = null;
+        state.selectedTrainId = null;
+        renderAll(true);
+      }, APP_CONFIG.settings.departureZoomMs);
+    }
+
+    function clearDepartureZoom() {
+      window.clearTimeout(departureZoomTimer);
+      departureZoomTimer = null;
+      state.departureZoomTrainId = null;
+    }
+
+    function restartAutoZoom() {
+      window.clearInterval(autoZoomTimer);
+      if (!state.autoZoomEnabled) return;
+      autoZoomTimer = window.setInterval(showNextAutoDetail, APP_CONFIG.settings.autoZoomIntervalMs);
+    }
+
+    function resetRotation() {
+      state.autoZoomIndex = -1;
+      state.selectedTrainId = null;
+      clearDepartureZoom();
+    }
+
+    function showNextAutoDetail() {
+      if (state.departureZoomTrainId) return;
+      if (!state.autoZoomEnabled || state.visibleTrains.length === 0) return;
+      state.autoZoomIndex = (state.autoZoomIndex + 1) % state.visibleTrains.length;
+      openDetail(state.visibleTrains[state.autoZoomIndex]);
+    }
+
+    function handleTrainSubmit(event) {
+      event.preventDefault();
+      clearFormErrors(els.trainForm);
+      const data = Object.fromEntries(new FormData(els.trainForm).entries());
+      const errors = state.mode === "airport" ? validateFormFlight(data) : validateFormTrain(data);
+      if (Object.keys(errors).length) {
+        showFormErrors(els.trainForm, errors);
+        els.formStatus.textContent = state.mode === "airport" ? "Let nebyl přidán. Opravte označená pole." : "Vlak nebyl přidán. Opravte označená pole.";
+        return;
+      }
+
+      const train = state.mode === "airport"
+        ? normalizeFlight({
+          id: createStableTripId("custom-flight", data.type, data.stationId, data.line, data.scheduledTime),
+          type: data.type,
+          airportId: data.stationId,
+          flightNumber: data.line.trim(),
+          airline: data.airline.trim() || null,
+          aircraftType: data.aircraftType.trim() || null,
+          aircraftModel: data.aircraftModel.trim() || null,
+          origin: data.origin.trim() || null,
+          destination: data.destination.trim() || null,
+          scheduledTime: data.scheduledTime,
+          terminal: data.terminal.trim() || null,
+          gate: data.platform.trim() || null,
+          status: data.status.trim() || (Number(data.delayMinutes || 0) > 0 ? "Delayed" : "On time"),
+          delayMinutes: data.delayMinutes === "" ? 0 : Number(data.delayMinutes)
+        })
+        : normalizeTrain({
+          id: createStableTripId("custom-train", data.type, data.stationId, data.line, data.scheduledTime),
+          type: data.type,
+          stationId: data.stationId,
+          line: data.line.trim(),
+          trainCategory: data.trainCategory.trim() || null,
+          carrier: data.carrier.trim() || null,
+          origin: data.origin.trim() || null,
+          destination: data.destination.trim() || null,
+          scheduledTime: data.scheduledTime,
+          platform: data.platform.trim() || null,
+          status: data.status.trim() || (Number(data.delayMinutes || 0) > 0 ? "Zpožděn" : "Včas"),
+          delayMinutes: data.delayMinutes === "" ? 0 : Number(data.delayMinutes)
+        });
+
+      upsertTripWithLinkedCounterpart(train);
+      persistDataState();
+      els.trainForm.reset();
+      els.formStatus.textContent = state.mode === "airport" ? "Let byl přidán do lokální demo vrstvy." : "Vlak byl přidán do lokální demo vrstvy.";
+      renderAll(true);
+      document.getElementById("trainType").value = train.type;
+      document.getElementById("trainStation").value = state.mode === "airport" ? train.airportId : train.stationId;
+      switchTab("boardPanel");
+    }
+
+    function handleStationSubmit(event) {
+      event.preventDefault();
+      clearFormErrors(els.stationForm);
+      const data = Object.fromEntries(new FormData(els.stationForm).entries());
+      const station = state.mode === "airport"
+        ? normalizeAirport({ id: data.id.trim() || slugify(data.name), name: data.name.trim(), code: data.code.trim() || data.id.trim().slice(0, 3).toUpperCase(), terminals: ["T1"], gates: ["A1", "B2", "C3"], runwayLayout: { runways: ["RWY"] } })
+        : normalizeStation({ id: data.id.trim() || slugify(data.name), name: data.name.trim(), trackLayout: { tracks: ["1", "2", "3"] } });
+      const errors = {};
+      if (!station || !station.name) errors.stationNameInput = state.mode === "airport" ? "Vyplňte název letiště." : "Vyplňte název zastávky.";
+      if (!station || !/^[a-z0-9-]+$/.test(station.id)) errors.stationIdInput = "ID může obsahovat malá písmena, čísla a pomlčky.";
+      if (station && state.mode === "airport" && getEffectiveAirports().some(existing => existing.id === station.id)) errors.stationIdInput = "Letiště s tímto ID už existuje.";
+      if (station && state.mode === "train" && getEffectiveStations().some(existing => existing.id === station.id)) errors.stationIdInput = "Zastávka s tímto ID už existuje.";
+      if (Object.keys(errors).length) {
+        showFormErrors(els.stationForm, errors);
+        els.stationStatus.textContent = state.mode === "airport" ? "Letiště nebylo přidáno." : "Zastávka nebyla přidána.";
+        return;
+      }
+      if (state.mode === "airport") {
+        state.customAirports = upsertById(state.customAirports, station);
+        state.airportId = station.id;
+      } else {
+        state.customStations = upsertById(state.customStations, station);
+        state.stationId = station.id;
+      }
+      persistDataState();
+      persistSettings();
+      els.stationForm.reset();
+      els.stationStatus.textContent = state.mode === "airport" ? "Letiště bylo přidáno." : "Zastávka byla přidána.";
+      renderAll(true);
+    }
+
+    function announceTrip(trip, force) {
+      if ((!state.announcementEnabled && !force) || !trip) return;
+      if ((state.mode === "airport" && !trip.flightNumber) || (state.mode === "train" && !trip.line)) return;
+      const text = buildAnnouncementText(trip);
+      if (!text || (!force && text === state.lastAnnouncementText)) return;
+      state.lastAnnouncementText = text;
+      showAnnouncementFallback(text);
+      if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "cs-CZ";
+      const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+      const czechVoice = voices.find(voice => /^cs([-_]|$)/i.test(voice.lang));
+      if (czechVoice) utterance.voice = czechVoice;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function buildAnnouncementText(trip) {
+      if (state.mode === "airport") {
+        if (trip.type === "arrival") {
+          return `Přílet letu ${trip.flightNumber} společnosti ${trip.airline || "neznámé"} z destinace ${trip.origin || displayDirection(trip)} je očekáván v ${addMinutes(trip.scheduledTime, trip.delayMinutes || 0)}.`;
+        }
+        return `Odlet letu ${trip.flightNumber} společnosti ${trip.airline || "neznámé"} do destinace ${trip.destination || displayDirection(trip)}. Prosíme cestující, aby se dostavili k bráně ${trip.gate || "-"}.`;
+      }
+      const station = getStation(trip.stationId);
+      if (trip.type === "arrival") {
+        return `Příjezd vlaku ${trip.line} ze stanice ${trip.origin || displayDirection(trip)} je očekáván na kolej ${trip.platform || "-"}.`;
+      }
+      return `Odjezd vlaku ${trip.line} ze stanice ${station ? station.name : trip.origin || "-"} do stanice ${trip.destination || displayDirection(trip)}.`;
+    }
+
+    function showAnnouncementFallback(text) {
+      els.announcementBanner.hidden = false;
+      els.announcementBanner.textContent = text;
+      window.setTimeout(() => {
+        if (els.announcementBanner.textContent === text) els.announcementBanner.hidden = true;
+      }, 12000);
+    }
+
+    function upsertTripWithLinkedCounterpart(trip) {
+      const airportMode = state.mode === "airport";
+      const currentLocation = airportMode ? getAirport(trip.airportId) : getStation(trip.stationId);
+      const targetLocation = findCounterpartLocation(trip, airportMode);
+      if (!targetLocation || !currentLocation || targetLocation.id === (airportMode ? trip.airportId : trip.stationId)) {
+        if (airportMode) state.customFlights = upsertById(state.customFlights, trip);
+        else state.customTrains = upsertById(state.customTrains, trip);
+        return;
+      }
+
+      const counterpart = airportMode
+        ? buildLinkedFlight(trip, currentLocation, targetLocation)
+        : buildLinkedTrain(trip, currentLocation, targetLocation);
+      if (!counterpart) {
+        if (airportMode) state.customFlights = upsertById(state.customFlights, trip);
+        else state.customTrains = upsertById(state.customTrains, trip);
+        return;
+      }
+      trip.linkedTripId = counterpart.id;
+      counterpart.linkedTripId = trip.id;
+      counterpart.generatedFromTripId = trip.id;
+
+      if (airportMode) {
+        state.customFlights = upsertById(upsertById(state.customFlights, trip), counterpart);
+      } else {
+        state.customTrains = upsertById(upsertById(state.customTrains, trip), counterpart);
+      }
+    }
+
+    function findCounterpartLocation(trip, airportMode) {
+      const endpoint = trip.type === "departure" ? trip.destination : trip.origin;
+      const locations = airportMode ? getEffectiveAirports() : getEffectiveStations();
+      const normalizedEndpoint = normalizeLookupText(endpoint);
+      if (!normalizedEndpoint) return null;
+      return locations.find(location => {
+        const keys = airportMode
+          ? [location.name, location.id, location.code]
+          : [location.name, location.id];
+        return keys.some(key => {
+          const normalizedKey = normalizeLookupText(key);
+          return normalizedKey && (normalizedKey === normalizedEndpoint || normalizedKey.includes(normalizedEndpoint) || normalizedEndpoint.includes(normalizedKey));
+        });
+      }) || null;
+    }
+
+    function buildLinkedTrain(train, currentStation, targetStation) {
+      const type = train.type === "departure" ? "arrival" : "departure";
+      return normalizeTrain({
+        id: createStableTripId("linked-train", type, targetStation.id, train.line, train.scheduledTime),
+        type,
+        stationId: targetStation.id,
+        line: train.line,
+        trainCategory: train.trainCategory,
+        carrier: train.carrier,
+        origin: type === "arrival" ? currentStation.name : null,
+        destination: type === "departure" ? currentStation.name : null,
+        scheduledTime: train.scheduledTime,
+        platform: train.platform,
+        status: train.status,
+        delayMinutes: train.delayMinutes,
+        linkedTripId: train.id,
+        generatedFromTripId: train.id
+      });
+    }
+
+    function buildLinkedFlight(flight, currentAirport, targetAirport) {
+      const type = flight.type === "departure" ? "arrival" : "departure";
+      return normalizeFlight({
+        id: createStableTripId("linked-flight", type, targetAirport.id, flight.flightNumber, flight.scheduledTime),
+        type,
+        airportId: targetAirport.id,
+        flightNumber: flight.flightNumber,
+        airline: flight.airline,
+        aircraftType: flight.aircraftType,
+        aircraftModel: flight.aircraftModel,
+        origin: type === "arrival" ? (currentAirport.code || currentAirport.name) : null,
+        destination: type === "departure" ? (currentAirport.code || currentAirport.name) : null,
+        scheduledTime: flight.scheduledTime,
+        terminal: flight.terminal,
+        gate: flight.gate,
+        status: flight.status,
+        delayMinutes: flight.delayMinutes,
+        linkedTripId: flight.id,
+        generatedFromTripId: flight.id
+      });
+    }
+
+    function validateFormTrain(data) {
+      const errors = {};
+      if (!VALID_BOARD_TYPES.includes(data.type)) errors.type = "Vyberte příjezd nebo odjezd.";
+      if (!getEffectiveStations().some(station => station.id === data.stationId)) errors.stationId = "Vyberte existující zastávku.";
+      if (!data.line || !data.line.trim()) errors.line = "Vyplňte linku nebo číslo spoje.";
+      if (!isValidTime(data.scheduledTime)) errors.scheduledTime = "Zadejte čas ve formátu HH:mm.";
+      if (data.delayMinutes !== "" && !/^\d+$/.test(data.delayMinutes)) errors.delayMinutes = "Zpoždění musí být celé nezáporné číslo.";
+      return errors;
+    }
+
+    function validateFormFlight(data) {
+      const errors = {};
+      if (!VALID_BOARD_TYPES.includes(data.type)) errors.type = "Vyberte přílet nebo odlet.";
+      if (!getEffectiveAirports().some(airport => airport.id === data.stationId)) errors.stationId = "Vyberte existující letiště.";
+      if (!data.line || !data.line.trim()) errors.line = "Vyplňte číslo letu.";
+      if (!isValidTime(data.scheduledTime)) errors.scheduledTime = "Zadejte čas ve formátu HH:mm.";
+      if (data.delayMinutes !== "" && !/^\d+$/.test(data.delayMinutes)) errors.delayMinutes = "Zpoždění musí být celé nezáporné číslo.";
+      return errors;
+    }
+
+    function clearFormErrors(form) {
+      form.querySelectorAll(".field").forEach(field => {
+        field.classList.remove("invalid");
+        const error = field.querySelector(".field-error");
+        if (error) error.textContent = "";
+      });
+    }
+
+    function showFormErrors(form, errors) {
+      Object.entries(errors).forEach(([fieldName, message]) => {
+        const field = form.querySelector(`[data-field="${fieldName}"]`);
+        if (!field) return;
+        field.classList.add("invalid");
+        field.querySelector(".field-error").textContent = message;
+      });
+    }
+
+    function renderManagement() {
+      if (state.mode === "airport") {
+        renderAirportList();
+        renderFlightList();
+      } else {
+        renderStationList();
+        renderTrainList();
+      }
+    }
+
+    function renderStationList() {
+      els.stationList.innerHTML = "";
+      const allStations = getAllStationsWithSource();
+      if (allStations.length === 0) {
+        els.stationList.innerHTML = `<p class="hint">Nejsou dostupne zadne zastavky.</p>`;
+        return;
+      }
+      allStations.forEach(({ station, source, hidden }) => {
+        const card = document.createElement("div");
+        card.className = "data-card";
+        card.innerHTML = `
+          <div>
+            <strong>${escapeHtml(station.name)}</strong>
+            <span>${escapeHtml(station.id)} / ${source === "demo" ? "demo" : "lokalni"}${hidden ? " / skryto" : ""}</span>
+          </div>
+          <div class="list-actions"></div>
+        `;
+        const actions = card.querySelector(".list-actions");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = hidden ? "secondary-button" : "danger-button";
+        button.textContent = source === "demo" ? (hidden ? "Obnovit" : "Skryt") : "Smazat";
+        button.addEventListener("click", () => {
+          if (source === "demo") toggleHiddenStation(station.id);
+          else deleteCustomStation(station.id);
+        });
+        actions.appendChild(button);
+        els.stationList.appendChild(card);
+      });
+    }
+
+    function renderTrainList() {
+      els.trainList.innerHTML = "";
+      const allTrains = getAllTrainsWithSource();
+      if (allTrains.length === 0) {
+        els.trainList.innerHTML = `<p class="hint">Nejsou dostupne zadne vlaky.</p>`;
+        return;
+      }
+      allTrains.forEach(({ train, source, hidden }) => {
+        const station = getStation(train.stationId);
+        const card = document.createElement("div");
+        card.className = "data-card";
+        card.innerHTML = `
+          <div>
+            <strong>${escapeHtml(train.line)} - ${escapeHtml(displayDirection(train))}</strong>
+            <span>${escapeHtml(train.scheduledTime)} / ${train.type === "departure" ? "odjezd" : "prijezd"} / ${escapeHtml(station ? station.name : train.stationId)} / ${source === "demo" ? "demo" : "lokalni"}${hidden ? " / skryto" : ""}</span>
+          </div>
+          <div class="list-actions"></div>
+        `;
+        const actions = card.querySelector(".list-actions");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = hidden ? "secondary-button" : "danger-button";
+        button.textContent = source === "demo" ? (hidden ? "Obnovit" : "Skryt") : "Smazat";
+        button.addEventListener("click", () => {
+          if (source === "demo") toggleHiddenTrain(train.id);
+          else deleteCustomTrain(train.id);
+        });
+        actions.appendChild(button);
+        els.trainList.appendChild(card);
+      });
+    }
+
+    function renderAirportList() {
+      els.stationList.innerHTML = "";
+      const allAirports = getAllAirportsWithSource();
+      if (allAirports.length === 0) {
+        els.stationList.innerHTML = `<p class="hint">Nejsou dostupna zadna letiste.</p>`;
+        return;
+      }
+      allAirports.forEach(({ airport, source, hidden }) => {
+        const card = document.createElement("div");
+        card.className = "data-card";
+        card.innerHTML = `
+          <div>
+            <strong>${escapeHtml(airport.name)}</strong>
+            <span>${escapeHtml(airport.code || airport.id)} / ${source === "demo" ? "demo" : "lokalni"}${hidden ? " / skryto" : ""}</span>
+          </div>
+          <div class="list-actions"></div>
+        `;
+        const actions = card.querySelector(".list-actions");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = hidden ? "secondary-button" : "danger-button";
+        button.textContent = source === "demo" ? (hidden ? "Obnovit" : "Skryt") : "Smazat";
+        button.addEventListener("click", () => {
+          if (source === "demo") toggleHiddenAirport(airport.id);
+          else deleteCustomAirport(airport.id);
+        });
+        actions.appendChild(button);
+        els.stationList.appendChild(card);
+      });
+    }
+
+    function renderFlightList() {
+      els.trainList.innerHTML = "";
+      const allFlights = getAllFlightsWithSource();
+      if (allFlights.length === 0) {
+        els.trainList.innerHTML = `<p class="hint">Nejsou dostupne zadne lety.</p>`;
+        return;
+      }
+      allFlights.forEach(({ flight, source, hidden }) => {
+        const airport = getAirport(flight.airportId);
+        const card = document.createElement("div");
+        card.className = "data-card";
+        card.innerHTML = `
+          <div>
+            <strong>${escapeHtml(flight.flightNumber)} - ${escapeHtml(displayDirection(flight))}</strong>
+            <span>${escapeHtml(flight.scheduledTime)} / ${flight.type === "departure" ? "odlet" : "prilet"} / ${escapeHtml(airport ? airport.name : flight.airportId)} / ${source === "demo" ? "demo" : "lokalni"}${hidden ? " / skryto" : ""}</span>
+          </div>
+          <div class="list-actions"></div>
+        `;
+        const actions = card.querySelector(".list-actions");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = hidden ? "secondary-button" : "danger-button";
+        button.textContent = source === "demo" ? (hidden ? "Obnovit" : "Skryt") : "Smazat";
+        button.addEventListener("click", () => {
+          if (source === "demo") toggleHiddenFlight(flight.id);
+          else deleteCustomFlight(flight.id);
+        });
+        actions.appendChild(button);
+        els.trainList.appendChild(card);
+      });
+    }
+
+    function toggleHiddenStation(id) {
+      state.hiddenStationIds = toggleValue(state.hiddenStationIds, id);
+      ensureValidStation();
+      persistDataState();
+      persistSettings();
+      renderAll(true);
+    }
+
+    function toggleHiddenTrain(id) {
+      state.hiddenTrainIds = toggleValue(state.hiddenTrainIds, id);
+      persistDataState();
+      renderAll(true);
+    }
+
+    function toggleHiddenAirport(id) {
+      state.hiddenAirportIds = toggleValue(state.hiddenAirportIds, id);
+      ensureValidAirport();
+      persistDataState();
+      persistSettings();
+      renderAll(true);
+    }
+
+    function toggleHiddenFlight(id) {
+      state.hiddenFlightIds = toggleValue(state.hiddenFlightIds, id);
+      persistDataState();
+      renderAll(true);
+    }
+
+    function deleteCustomStation(id) {
+      state.customStations = state.customStations.filter(station => station.id !== id);
+      state.customTrains = state.customTrains.filter(train => train.stationId !== id);
+      ensureValidStation();
+      persistDataState();
+      persistSettings();
+      renderAll(true);
+    }
+
+    function deleteCustomTrain(id) {
+      state.customTrains = state.customTrains.filter(train => train.id !== id);
+      persistDataState();
+      renderAll(true);
+    }
+
+    function deleteCustomAirport(id) {
+      state.customAirports = state.customAirports.filter(airport => airport.id !== id);
+      state.customFlights = state.customFlights.filter(flight => flight.airportId !== id);
+      ensureValidAirport();
+      persistDataState();
+      persistSettings();
+      renderAll(true);
+    }
+
+    function deleteCustomFlight(id) {
+      state.customFlights = state.customFlights.filter(flight => flight.id !== id);
+      persistDataState();
+      renderAll(true);
+    }
+
+    function exportSnapshot() {
+      const snapshot = buildSnapshot();
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `vlakove-tabule-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      els.importStatus.textContent = "Export byl pripraven ke stazeni.";
+    }
+
+    function importSnapshot() {
+      const snapshot = safeJson(els.importText.value, null);
+      if (!snapshot || typeof snapshot !== "object") {
+        els.importStatus.textContent = "Import selhal: JSON neni platny.";
+        return;
+      }
+
+      const incomingStations = Array.isArray(snapshot.customStations)
+        ? snapshot.customStations.map(normalizeStation).filter(station => station && !isDemoStationId(station.id))
+        : [];
+      const incomingTrains = Array.isArray(snapshot.customTrains) ? snapshot.customTrains.map(normalizeTrain).filter(Boolean) : [];
+      const incomingAirports = Array.isArray(snapshot.customAirports) ? snapshot.customAirports.map(normalizeAirport).filter(airport => airport && !isDemoAirportId(airport.id)) : [];
+      state.customStations = mergeById(state.customStations, incomingStations);
+      state.customTrains = mergeById(state.customTrains, incomingTrains).filter(train => getEffectiveStations().some(station => station.id === train.stationId));
+      state.customAirports = mergeById(state.customAirports, incomingAirports);
+      const incomingFlights = Array.isArray(snapshot.customFlights) ? snapshot.customFlights.map(normalizeFlight).filter(Boolean) : [];
+      state.customFlights = mergeById(state.customFlights, incomingFlights).filter(flight => getEffectiveAirports().some(airport => airport.id === flight.airportId));
+      state.hiddenStationIds = unique(state.hiddenStationIds.concat(asStringArray(snapshot.hiddenStationIds))).filter(id => APP_CONFIG.stations.some(station => station.id === id));
+      state.hiddenTrainIds = unique(state.hiddenTrainIds.concat(asStringArray(snapshot.hiddenTrainIds))).filter(id => APP_CONFIG.trains.some(train => train.id === id));
+      state.hiddenAirportIds = unique(state.hiddenAirportIds.concat(asStringArray(snapshot.hiddenAirportIds))).filter(id => APP_CONFIG.airports.some(airport => airport.id === id));
+      state.hiddenFlightIds = unique(state.hiddenFlightIds.concat(asStringArray(snapshot.hiddenFlightIds))).filter(id => APP_CONFIG.flights.some(flight => flight.id === id));
+
+      if (snapshot.settings && typeof snapshot.settings === "object") {
+        applyImportedSettings(snapshot.settings);
+      }
+
+      ensureValidStation();
+      ensureValidAirport();
+      persistDataState();
+      persistSettings();
+      els.importStatus.textContent = `Import hotov: ${incomingStations.length} zastavek, ${incomingTrains.length} vlaku, ${incomingAirports.length} letist, ${incomingFlights.length} letu. Duplicity byly slouceny podle ID.`;
+      renderAll(true);
+    }
+
+    function clearLocalState() {
+      state.customStations = [];
+      state.customTrains = [];
+      state.customAirports = [];
+      state.customFlights = [];
+      state.hiddenStationIds = [];
+      state.hiddenTrainIds = [];
+      state.hiddenAirportIds = [];
+      state.hiddenFlightIds = [];
+      ensureValidStation();
+      ensureValidAirport();
+      persistDataState();
+      persistSettings();
+      renderAll(true);
+      els.importStatus.textContent = "Lokalni datovy stav byl vymazan.";
+    }
+
+    function buildSnapshot() {
+      return {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        settings: {
+          mode: state.mode,
+          stationId: state.stationId,
+          airportId: state.airportId,
+          boardType: state.boardType,
+          design: state.design,
+          clockMode: state.clockMode,
+          manualTime: state.manualTime,
+          autoZoomEnabled: state.autoZoomEnabled,
+          announcementEnabled: state.announcementEnabled,
+          airportSchemaHidden: state.airportSchemaHidden,
+          boardPanelSize: state.boardPanelSize,
+          schemaPanelSize: state.schemaPanelSize,
+          acceleratedTimeMultiplier: state.acceleratedTimeMultiplier,
+          retroAnimationSpeed: state.retroAnimationSpeed
+        },
+        customStations: state.customStations,
+        customTrains: state.customTrains,
+        customAirports: state.customAirports,
+        customFlights: state.customFlights,
+        hiddenStationIds: state.hiddenStationIds,
+        hiddenTrainIds: state.hiddenTrainIds,
+        hiddenAirportIds: state.hiddenAirportIds,
+        hiddenFlightIds: state.hiddenFlightIds
+      };
+    }
+
+    function applyImportedSettings(settings) {
+      state.mode = safeChoice(settings.mode, VALID_MODES, state.mode);
+      state.boardType = safeChoice(settings.boardType, VALID_BOARD_TYPES, state.boardType);
+      state.design = safeChoice(settings.design, VALID_DESIGNS, state.design);
+      state.clockMode = safeChoice(settings.clockMode, VALID_CLOCK_MODES, state.clockMode);
+      state.manualTime = isValidTime(settings.manualTime) ? settings.manualTime : state.manualTime;
+      state.autoZoomEnabled = typeof settings.autoZoomEnabled === "boolean" ? settings.autoZoomEnabled : state.autoZoomEnabled;
+      state.announcementEnabled = typeof settings.announcementEnabled === "boolean" ? settings.announcementEnabled : state.announcementEnabled;
+      state.airportSchemaHidden = typeof settings.airportSchemaHidden === "boolean" ? settings.airportSchemaHidden : state.airportSchemaHidden;
+      state.boardPanelSize = clampPanelSize(settings.boardPanelSize ?? state.boardPanelSize, 45, 82);
+      state.schemaPanelSize = clampPanelSize(settings.schemaPanelSize ?? (100 - state.boardPanelSize), 18, 55);
+      normalizePanelSizes();
+      state.acceleratedTimeMultiplier = clampAcceleratedMultiplier(settings.acceleratedTimeMultiplier ?? state.acceleratedTimeMultiplier);
+      state.retroAnimationSpeed = clampRetroSpeed(settings.retroAnimationSpeed ?? state.retroAnimationSpeed);
+      state.stationId = safeStationId(settings.stationId);
+      state.airportId = safeAirportId(settings.airportId);
+      if (state.clockMode === "accelerated") resetAcceleratedClock();
+    }
+
+    function loadSettings() {
+      const saved = safeJson(localStorage.getItem(APP_CONFIG.settings.storageKey), {});
+      state.mode = safeChoice(saved.mode, VALID_MODES, APP_CONFIG.settings.defaultMode);
+      state.stationId = typeof saved.stationId === "string" && saved.stationId ? saved.stationId : APP_CONFIG.settings.defaultStationId;
+      state.airportId = typeof saved.airportId === "string" && saved.airportId ? saved.airportId : APP_CONFIG.settings.defaultAirportId;
+      state.boardType = safeChoice(saved.boardType, VALID_BOARD_TYPES, APP_CONFIG.settings.defaultBoardType);
+      state.design = safeChoice(saved.design, VALID_DESIGNS, APP_CONFIG.settings.defaultDesign);
+      state.clockMode = safeChoice(saved.clockMode, VALID_CLOCK_MODES, APP_CONFIG.settings.clockMode);
+      state.manualTime = isValidTime(saved.manualTime) ? saved.manualTime : "09:30";
+      state.autoZoomEnabled = typeof saved.autoZoomEnabled === "boolean" ? saved.autoZoomEnabled : APP_CONFIG.settings.autoZoomEnabled;
+      state.announcementEnabled = typeof saved.announcementEnabled === "boolean" ? saved.announcementEnabled : APP_CONFIG.settings.announcementEnabled;
+      state.airportSchemaHidden = typeof saved.airportSchemaHidden === "boolean" ? saved.airportSchemaHidden : APP_CONFIG.settings.airportSchemaHidden;
+      state.boardPanelSize = clampPanelSize(saved.boardPanelSize ?? APP_CONFIG.settings.boardPanelSize, 45, 82);
+      state.schemaPanelSize = clampPanelSize(saved.schemaPanelSize ?? APP_CONFIG.settings.schemaPanelSize, 18, 55);
+      normalizePanelSizes();
+      state.acceleratedTimeMultiplier = clampAcceleratedMultiplier(saved.acceleratedTimeMultiplier ?? APP_CONFIG.settings.acceleratedTimeMultiplier);
+      state.retroAnimationSpeed = clampRetroSpeed(saved.retroAnimationSpeed ?? APP_CONFIG.settings.retroAnimationSpeed);
+      if (state.clockMode === "accelerated") resetAcceleratedClock();
+    }
+
+    function persistSettings() {
+      const payload = {
+        mode: state.mode,
+        stationId: state.stationId,
+        airportId: state.airportId,
+        boardType: state.boardType,
+        design: state.design,
+        clockMode: state.clockMode,
+        manualTime: state.manualTime,
+        autoZoomEnabled: state.autoZoomEnabled,
+        announcementEnabled: state.announcementEnabled,
+        airportSchemaHidden: state.airportSchemaHidden,
+        boardPanelSize: state.boardPanelSize,
+        schemaPanelSize: state.schemaPanelSize,
+        acceleratedTimeMultiplier: state.acceleratedTimeMultiplier,
+        retroAnimationSpeed: state.retroAnimationSpeed
+      };
+      localStorage.setItem(APP_CONFIG.settings.storageKey, JSON.stringify(payload));
+    }
+
+    function loadDataState() {
+      const saved = safeJson(localStorage.getItem(APP_CONFIG.settings.dataStateStorageKey), {});
+      const legacyTrains = safeJson(localStorage.getItem(APP_CONFIG.settings.customTrainsStorageKey), []);
+      state.customStations = Array.isArray(saved.customStations)
+        ? saved.customStations.map(normalizeStation).filter(station => station && !isDemoStationId(station.id))
+        : [];
+      const savedTrains = Array.isArray(saved.customTrains) ? saved.customTrains : [];
+      const legacyValid = Array.isArray(legacyTrains) ? legacyTrains : [];
+      state.customTrains = mergeById([], savedTrains.concat(legacyValid).map(normalizeTrain).filter(Boolean));
+      state.customAirports = Array.isArray(saved.customAirports)
+        ? saved.customAirports.map(normalizeAirport).filter(airport => airport && !isDemoAirportId(airport.id))
+        : [];
+      state.customFlights = Array.isArray(saved.customFlights)
+        ? saved.customFlights.map(normalizeFlight).filter(Boolean)
+        : [];
+      state.hiddenStationIds = asStringArray(saved.hiddenStationIds);
+      state.hiddenTrainIds = asStringArray(saved.hiddenTrainIds);
+      state.hiddenAirportIds = asStringArray(saved.hiddenAirportIds);
+      state.hiddenFlightIds = asStringArray(saved.hiddenFlightIds);
+      persistDataState();
+    }
+
+    function persistDataState() {
+      const payload = {
+        schemaVersion: 1,
+        customStations: state.customStations,
+        customTrains: state.customTrains,
+        customAirports: state.customAirports,
+        customFlights: state.customFlights,
+        hiddenStationIds: state.hiddenStationIds,
+        hiddenTrainIds: state.hiddenTrainIds,
+        hiddenAirportIds: state.hiddenAirportIds,
+        hiddenFlightIds: state.hiddenFlightIds
+      };
+      localStorage.setItem(APP_CONFIG.settings.dataStateStorageKey, JSON.stringify(payload));
+      localStorage.setItem(APP_CONFIG.settings.customTrainsStorageKey, JSON.stringify(state.customTrains));
+    }
+
+    function fillStationSelects() {
+      const locations = state.mode === "airport" ? getEffectiveAirports() : getEffectiveStations();
+      const options = locations
+        .map(station => `<option value="${escapeHtml(station.id)}">${escapeHtml(station.name)}</option>`)
+        .join("");
+      els.stationSelect.innerHTML = options;
+      els.trainStation.innerHTML = options;
+    }
+
+    function ensureValidStation() {
+      state.stationId = safeStationId(state.stationId);
+    }
+
+    function ensureValidAirport() {
+      state.airportId = safeAirportId(state.airportId);
+    }
+
+    function safeStationId(value) {
+      const stations = getEffectiveStations();
+      if (stations.some(station => station.id === value)) return value;
+      if (stations.some(station => station.id === APP_CONFIG.settings.defaultStationId)) return APP_CONFIG.settings.defaultStationId;
+      return stations[0] ? stations[0].id : "";
+    }
+
+    function safeAirportId(value) {
+      const airports = getEffectiveAirports();
+      if (airports.some(airport => airport.id === value)) return value;
+      if (airports.some(airport => airport.id === APP_CONFIG.settings.defaultAirportId)) return APP_CONFIG.settings.defaultAirportId;
+      return airports[0] ? airports[0].id : "";
+    }
+
+    function getActiveLocationId() {
+      return state.mode === "airport" ? state.airportId : state.stationId;
+    }
+
+    function getActiveLocation() {
+      return state.mode === "airport" ? getAirport(state.airportId) : getStation(state.stationId);
+    }
+
+    function getEffectiveStations() {
+      return mergeById(
+        APP_CONFIG.stations.filter(station => !state.hiddenStationIds.includes(station.id)),
+        state.customStations
+      );
+    }
+
+    function getEffectiveTrains() {
+      const stationIds = new Set(getEffectiveStations().map(station => station.id));
+      return mergeById(
+        APP_CONFIG.trains.filter(train => !state.hiddenTrainIds.includes(train.id)),
+        state.customTrains
+      ).filter(train => stationIds.has(train.stationId));
+    }
+
+    function getEffectiveAirports() {
+      return mergeById(
+        APP_CONFIG.airports.filter(airport => !state.hiddenAirportIds.includes(airport.id)),
+        state.customAirports
+      );
+    }
+
+    function getEffectiveFlights() {
+      const airportIds = new Set(getEffectiveAirports().map(airport => airport.id));
+      return mergeById(
+        APP_CONFIG.flights.filter(flight => !state.hiddenFlightIds.includes(flight.id)),
+        state.customFlights
+      ).filter(flight => airportIds.has(flight.airportId));
+    }
+
+    function getEffectiveTrips() {
+      return state.mode === "airport" ? getEffectiveFlights() : getEffectiveTrains();
+    }
+
+    function getAllStationsWithSource() {
+      return APP_CONFIG.stations.map(station => ({
+        station,
+        source: "demo",
+        hidden: state.hiddenStationIds.includes(station.id)
+      })).concat(state.customStations.map(station => ({ station, source: "custom", hidden: false })));
+    }
+
+    function getAllTrainsWithSource() {
+      return APP_CONFIG.trains.map(train => ({
+        train,
+        source: "demo",
+        hidden: state.hiddenTrainIds.includes(train.id) || state.hiddenStationIds.includes(train.stationId)
+      })).concat(state.customTrains.map(train => ({ train, source: "custom", hidden: false })));
+    }
+
+    function getAllAirportsWithSource() {
+      return APP_CONFIG.airports.map(airport => ({
+        airport,
+        source: "demo",
+        hidden: state.hiddenAirportIds.includes(airport.id)
+      })).concat(state.customAirports.map(airport => ({ airport, source: "custom", hidden: false })));
+    }
+
+    function getAllFlightsWithSource() {
+      return APP_CONFIG.flights.map(flight => ({
+        flight,
+        source: "demo",
+        hidden: state.hiddenFlightIds.includes(flight.id) || state.hiddenAirportIds.includes(flight.airportId)
+      })).concat(state.customFlights.map(flight => ({ flight, source: "custom", hidden: false })));
+    }
+
+    function getStation(id) {
+      return getEffectiveStations().find(station => station.id === id) || null;
+    }
+
+    function getTrainById(id) {
+      return getEffectiveTrains().find(train => train.id === id) || null;
+    }
+
+    function getAirport(id) {
+      return getEffectiveAirports().find(airport => airport.id === id) || null;
+    }
+
+    function getFlightById(id) {
+      return getEffectiveFlights().find(flight => flight.id === id) || null;
+    }
+
+    function getTripById(id) {
+      return state.mode === "airport" ? getFlightById(id) : getTrainById(id);
+    }
+
+    function isDemoStationId(id) {
+      return APP_CONFIG.stations.some(station => station.id === id);
+    }
+
+    function isDemoAirportId(id) {
+      return APP_CONFIG.airports.some(airport => airport.id === id);
+    }
+
+    function normalizeStation(station) {
+      if (!station || typeof station !== "object") return null;
+      const name = String(station.name || "").trim();
+      const id = String(station.id || slugify(name)).trim();
+      if (!name || !/^[a-z0-9-]+$/.test(id)) return null;
+      const tracks = station.trackLayout && Array.isArray(station.trackLayout.tracks)
+        ? station.trackLayout.tracks.map(item => String(item || "").trim()).filter(Boolean).slice(0, 10)
+        : ["1", "2", "3"];
+      return { id, name, trackLayout: { tracks } };
+    }
+
+    function normalizeAirport(airport) {
+      if (!airport || typeof airport !== "object") return null;
+      const name = String(airport.name || "").trim();
+      const id = String(airport.id || slugify(name)).trim();
+      if (!name || !/^[a-z0-9-]+$/.test(id)) return null;
+      const code = String(airport.code || id.slice(0, 3)).trim().toUpperCase().slice(0, 4);
+      const terminals = Array.isArray(airport.terminals) ? airport.terminals.map(nullableText).filter(Boolean).slice(0, 8) : ["T1"];
+      const gates = Array.isArray(airport.gates) ? airport.gates.map(nullableText).filter(Boolean).slice(0, 12) : ["A1", "B2", "C3"];
+      const runways = airport.runwayLayout && Array.isArray(airport.runwayLayout.runways)
+        ? airport.runwayLayout.runways.map(nullableText).filter(Boolean).slice(0, 5)
+        : ["RWY"];
+      return { id, name, code, terminals, gates, runwayLayout: { runways } };
+    }
+
+    function normalizeTrain(train) {
+      if (!train || typeof train !== "object") return null;
+      const normalized = {
+        id: typeof train.id === "string" && train.id.trim() ? train.id.trim() : createId("custom-train", train.line || "vlak"),
+        type: train.type,
+        stationId: train.stationId,
+        line: String(train.line || "").trim(),
+        trainCategory: nullableText(train.trainCategory),
+        carrier: nullableText(train.carrier),
+        origin: nullableText(train.origin),
+        destination: nullableText(train.destination),
+        scheduledTime: train.scheduledTime,
+        platform: nullableText(train.platform),
+        status: nullableText(train.status),
+        delayMinutes: train.delayMinutes === undefined || train.delayMinutes === "" ? 0 : Number(train.delayMinutes),
+        linkedTripId: nullableText(train.linkedTripId),
+        generatedFromTripId: nullableText(train.generatedFromTripId)
+      };
+      return isValidTrain(normalized) ? normalized : null;
+    }
+
+    function isValidTrain(train) {
+      return Boolean(
+        train &&
+        typeof train.id === "string" &&
+        VALID_BOARD_TYPES.includes(train.type) &&
+        getEffectiveStations().some(station => station.id === train.stationId) &&
+        typeof train.line === "string" &&
+        train.line.trim() &&
+        isValidTime(train.scheduledTime) &&
+        Number.isInteger(Number(train.delayMinutes)) &&
+        Number(train.delayMinutes) >= 0
+      );
+    }
+
+    function normalizeFlight(flight) {
+      if (!flight || typeof flight !== "object") return null;
+      const normalized = {
+        id: typeof flight.id === "string" && flight.id.trim() ? flight.id.trim() : createId("custom-flight", flight.flightNumber || "let"),
+        type: flight.type,
+        airportId: flight.airportId,
+        flightNumber: String(flight.flightNumber || flight.line || "").trim(),
+        airline: nullableText(flight.airline),
+        aircraftType: nullableText(flight.aircraftType),
+        aircraftModel: nullableText(flight.aircraftModel),
+        origin: nullableText(flight.origin),
+        destination: nullableText(flight.destination),
+        scheduledTime: flight.scheduledTime,
+        terminal: nullableText(flight.terminal),
+        gate: nullableText(flight.gate || flight.platform),
+        status: nullableText(flight.status),
+        delayMinutes: flight.delayMinutes === undefined || flight.delayMinutes === "" ? 0 : Number(flight.delayMinutes),
+        linkedTripId: nullableText(flight.linkedTripId),
+        generatedFromTripId: nullableText(flight.generatedFromTripId)
+      };
+      return isValidFlight(normalized) ? normalized : null;
+    }
+
+    function isValidFlight(flight) {
+      return Boolean(
+        flight &&
+        typeof flight.id === "string" &&
+        VALID_BOARD_TYPES.includes(flight.type) &&
+        getEffectiveAirports().some(airport => airport.id === flight.airportId) &&
+        typeof flight.flightNumber === "string" &&
+        flight.flightNumber.trim() &&
+        isValidTime(flight.scheduledTime) &&
+        Number.isInteger(Number(flight.delayMinutes)) &&
+        Number(flight.delayMinutes) >= 0
+      );
+    }
+
+    function isValidTrip(trip) {
+      return state.mode === "airport" ? isValidFlight(trip) : isValidTrain(trip);
+    }
+
+    function displayDirection(train) {
+      return train.type === "departure" ? (train.destination || "-") : (train.origin || "-");
+    }
+
+    function tripLabel(train) {
+      return state.mode === "airport" ? train.flightNumber : train.line;
+    }
+
+    function defaultStatus(train) {
+      return train.delayMinutes > 0 ? "Zpožděn" : "Včas";
+    }
+
+    function displayStatus(trip, referenceMinutes) {
+      if (state.mode !== "airport") return trip.status || defaultStatus(trip);
+      return computeFlightStatus(trip, referenceMinutes);
+    }
+
+    function computeFlightStatus(flight, referenceMinutes) {
+      const effective = effectiveTimeToMinutes(flight);
+      const delta = effective - referenceMinutes;
+      if (flight.type === "arrival") {
+        if (delta < -8) return "Arrived";
+        if (delta <= 0) return "Landed";
+        if (delta <= 12) return "On approach";
+        return "Expected";
+      }
+      if (delta < -3) return "Departed";
+      if (delta <= 0) return "Taxiing";
+      if (delta <= 5) return "Final call";
+      if (delta <= 18) return "Boarding";
+      return "Gate open";
+    }
+
+    function delayText(train) {
+      return train.delayMinutes > 0 ? `+${train.delayMinutes}` : "Včas";
+    }
+
+    function effectiveTimeToMinutes(train) {
+      return timeToMinutes(train.scheduledTime) + Number(train.delayMinutes || 0);
+    }
+
+    function departureVisibleUntil(trip) {
+      return effectiveTimeToMinutes(trip);
+    }
+
+    function isValidTime(value) {
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(value || "");
+    }
+
+    function timeToMinutes(value) {
+      const [hours, minutes] = value.split(":").map(Number);
+      return hours * 60 + minutes;
+    }
+
+    function minutesToTime(totalMinutes) {
+      const normalized = ((Math.floor(totalMinutes) % 1440) + 1440) % 1440;
+      const hours = String(Math.floor(normalized / 60)).padStart(2, "0");
+      const minutes = String(normalized % 60).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+
+    function addMinutes(time, minutes) {
+      return minutesToTime(timeToMinutes(time) + Number(minutes || 0));
+    }
+
+    function safeChoice(value, allowed, fallback) {
+      return allowed.includes(value) ? value : fallback;
+    }
+
+    function safeJson(raw, fallback) {
+      try {
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function nullableText(value) {
+      const text = String(value || "").trim();
+      return text || null;
+    }
+
+    function slugify(value) {
+      return String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 50) || createId("station", "nova");
+    }
+
+    function createId(prefix, seed) {
+      const base = slugify(seed).slice(0, 32) || "item";
+      return `${prefix}-${base}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    function createStableTripId(prefix, type, locationId, line, scheduledTime) {
+      return [prefix, type, locationId, line, scheduledTime]
+        .map(part => slugify(part).slice(0, 32) || "x")
+        .join("-");
+    }
+
+    function normalizeLookupText(value) {
+      return String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    }
+
+    function upsertById(items, item) {
+      return mergeById(items.filter(existing => existing.id !== item.id), [item]);
+    }
+
+    function mergeById(base, incoming) {
+      const map = new Map();
+      base.concat(incoming).forEach(item => {
+        if (item && item.id) map.set(item.id, item);
+      });
+      return Array.from(map.values());
+    }
+
+    function unique(values) {
+      return Array.from(new Set(values.filter(value => typeof value === "string" && value)));
+    }
+
+    function asStringArray(value) {
+      return Array.isArray(value) ? unique(value.map(item => String(item || ""))) : [];
+    }
+
+    function toggleValue(values, value) {
+      return values.includes(value) ? values.filter(item => item !== value) : values.concat(value);
+    }
+
+    init();
+  </script>
+</body>
+</html>
