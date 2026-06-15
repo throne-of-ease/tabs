@@ -3,6 +3,9 @@
 ## Project Structure & Module Organization
 This repository is a static single-page app. The main application lives in `index.html`, which contains the markup, CSS, and JavaScript in one file. GitHub Pages deployment is defined in `.github/workflows/pages.yml`; it copies `index.html` into `dist/` during CI. The `old/` directory contains retired material and should not be used for new work unless a change explicitly targets archived assets.
 
+* **USE** uv (package manager) for all things python
+* use windows command line commands
+
 ## Build, Test, and Development Commands
 There is no package-based build step.
 

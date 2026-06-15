@@ -471,6 +471,10 @@
       stroke-linejoin: round;
     }
 
+    .airport-route {
+      stroke-width: 0.7;
+    }
+
     .station-rail.active,
     .airport-route.active {
       stroke: var(--accent);
@@ -528,12 +532,12 @@
     .airport-runway {
       fill: #18232c;
       stroke: rgba(255, 255, 255, 0.5);
-      stroke-width: 0.9;
+      stroke-width: 0.3;
     }
 
     .airport-runway-center {
       stroke: rgba(255, 255, 255, 0.58);
-      stroke-width: 0.6;
+      stroke-width: 0.2;
       stroke-dasharray: 4 4;
       stroke-linecap: round;
     }
@@ -541,18 +545,22 @@
     .airport-taxiway {
       fill: none;
       stroke: rgba(190, 205, 219, 0.28);
-      stroke-width: 0.95;
+      stroke-width: 0.3;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
 
     .airport-taxiway.connector {
       stroke: rgba(190, 205, 219, 0.42);
-      stroke-width: 0.75;
+      stroke-width: 0.25;
     }
 
     .airport-taxiway.active {
       stroke: var(--accent);
+    }
+
+    .airport-minimap-svg .station-map-grid {
+      stroke-width: 0.11;
     }
 
     .direction-label {
@@ -674,6 +682,31 @@
 
     body.play-mode .top-actions {
       justify-content: end;
+    }
+
+    body.play-mode .board-layout:not(.schema-hidden) {
+      grid-template-columns: minmax(0, 1fr) 8px minmax(220px, 28vw);
+      gap: 10px;
+    }
+
+    body.play-mode .board-layout:not(.schema-hidden) .board-shell {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    body.play-mode .board-layout:not(.schema-hidden) .row-grid {
+      grid-template-columns: minmax(54px, 0.55fr) minmax(72px, 0.72fr) minmax(116px, 1.38fr) minmax(48px, 0.5fr) minmax(104px, 1.12fr) minmax(58px, 0.58fr);
+      gap: clamp(4px, 0.55vw, 8px);
+    }
+
+    body.play-mode .board-layout:not(.schema-hidden) .board-headings {
+      padding-inline: 9px;
+      font-size: clamp(0.58rem, 0.75vw, 0.72rem);
+    }
+
+    body.play-mode .board-layout:not(.schema-hidden) .train-row {
+      padding-inline: 9px;
+      font-size: clamp(0.72rem, 0.95vw, 0.95rem);
     }
 
     @keyframes routeFlow {
@@ -1529,6 +1562,9 @@
     const VALID_DESIGNS = ["digital", "retro"];
     const VALID_CLOCK_MODES = ["real", "manual", "accelerated"];
     const SVG_NS = "http://www.w3.org/2000/svg";
+    const AIRPORT_SCHEMA_FLIGHT_LIMIT = 5;
+    const AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES = 7;
+    const AIRPORT_ARRIVAL_SCHEMA_EXIT_MINUTES = 11;
     const STATION_ROUTE_TEMPLATES = [
       { id: "west-north", y: 26, edgeX: 8, edgeY: 18, c1x: 39, c1y: 32, c2x: 24, c2y: 20, labelX: 9, labelY: 13, direction: "Sever" },
       { id: "west-main", y: 39, edgeX: 7, edgeY: 42, c1x: 38, c1y: 45, c2x: 22, c2y: 42, labelX: 9, labelY: 49, direction: "Zapad" },
@@ -1580,7 +1616,10 @@
       animationRunId: 0,
       animationTimers: [],
       movementMarkerPositions: {},
-      lastAnnouncementText: ""
+      lastAnnouncementText: "",
+      announcedDepartureKeys: [],
+      lastDepartureCheckMinutes: null,
+      visibleSignature: ""
     };
 
     const els = {
@@ -1659,6 +1698,7 @@
       fillStationSelects();
       bindEvents();
       renderAll(true);
+      resetDepartureAnnouncementClock();
       setInterval(tick, 1000);
       restartAutoZoom();
     }
@@ -1673,6 +1713,7 @@
         if (!button) return;
         state.mode = safeChoice(button.dataset.value, VALID_MODES, APP_CONFIG.settings.defaultMode);
         resetRotation();
+        resetDepartureAnnouncementClock();
         persistSettings();
         renderAll(true);
       });
@@ -1681,6 +1722,7 @@
         if (state.mode === "airport") state.airportId = safeAirportId(els.stationSelect.value);
         else state.stationId = safeStationId(els.stationSelect.value);
         resetRotation();
+        resetDepartureAnnouncementClock();
         persistSettings();
         renderAll(true);
       });
@@ -1706,6 +1748,7 @@
         state.clockMode = safeChoice(els.clockModeSelect.value, VALID_CLOCK_MODES, APP_CONFIG.settings.clockMode);
         resetAcceleratedClock();
         resetRotation();
+        resetDepartureAnnouncementClock();
         persistSettings();
         renderAll(true);
       });
@@ -1806,10 +1849,10 @@
     }
 
     function tick() {
-      const before = buildVisibleSignature();
       renderClock();
+      checkAutomaticDepartures(getReferenceMinutes());
       const after = buildVisibleSignature();
-      if (after !== before) renderWithDepartureDetection(true);
+      if (after !== state.visibleSignature) renderWithDepartureDetection(true);
     }
 
     function renderAll(forceFlip) {
@@ -1982,8 +2025,9 @@
       const referenceMinutes = getReferenceMinutes();
       const rows = getVisibleRows(referenceMinutes);
       const selectedTrip = state.selectedTrainId ? getTripById(state.selectedTrainId) : null;
+      const visibleSignature = rows.map(trip => trip ? `${trip.id}:${trip.scheduledTime}:${trip.delayMinutes}:${displayStatus(trip, referenceMinutes)}` : "empty").join("|");
       const signature = [
-        rows.map(trip => trip ? `${trip.id}:${trip.scheduledTime}:${trip.delayMinutes}:${displayStatus(trip, referenceMinutes)}` : "empty").join("|"),
+        visibleSignature,
         state.design,
         state.mode,
         state.boardType,
@@ -1993,6 +2037,7 @@
       const shouldFlip = forceFlip || signature !== state.renderSignature;
 
       state.visibleTrains = rows.filter(Boolean);
+      state.visibleSignature = visibleSignature;
       state.renderSignature = signature;
       els.stationName.textContent = location ? location.name : (state.mode === "airport" ? "Bez letiště" : "Bez zastávky");
       els.boardTypeLabel.textContent = state.boardType === "departure"
@@ -2443,12 +2488,12 @@
     function renderAirportMovement(airport, referenceMinutes) {
       const gates = airport && Array.isArray(airport.gates) && airport.gates.length ? airport.gates : ["A1", "B2", "C3"];
       const template = getAirportMapTemplate(airport, gates);
-      const flights = state.visibleTrains.slice(0, Math.min(5, state.visibleTrains.length));
+      const flights = getAirportSchemaFlights(airport, referenceMinutes).slice(0, AIRPORT_SCHEMA_FLIGHT_LIMIT);
       const gatePositions = template.gates;
       const activeGateIds = new Set(flights.map((flight, index) => flight.gate || gates[index % gates.length]));
 
       const svg = createSvgElement("svg", {
-        class: "station-minimap-svg",
+        class: "station-minimap-svg airport-minimap-svg",
         viewBox: "0 0 100 100",
         role: "img",
         "aria-label": "Schematická mapa letiště, gate, pojížděcích drah a aktuální polohy letů",
@@ -2506,14 +2551,17 @@
       const routeEntries = flights.map((flight, index) => {
         const gate = flight.gate || gates[index % gates.length];
         const gatePoint = gatePositions.find(position => position.gate === gate) || gatePositions[index % gatePositions.length];
-        const runway = template.runways[index % template.runways.length];
-        const runwayPoint = runway.routePoints[index % runway.routePoints.length];
+        const gateIndex = Math.max(0, gatePositions.findIndex(position => position.gate === gatePoint.gate));
+        const runway = template.runways[gateIndex % template.runways.length];
+        const runwayPoint = runway.routePoints[gateIndex % runway.routePoints.length];
         const route = {
           id: `${flight.id}-${gatePoint.gate}`,
           gate: gatePoint.gate,
           runwayX: flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2,
           runwayY: flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2,
           angle: runway.angle,
+          departureEnd: { x: runwayPoint.x2, y: runwayPoint.y2 },
+          arrivalStart: { x: runwayPoint.x1, y: runwayPoint.y1 },
           d: `M ${gatePoint.x} ${gatePoint.y} C ${template.routeHub.x} ${template.routeHub.y}, ${runwayPoint.cx} ${runwayPoint.cy}, ${flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2} ${flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2}`
         };
         route.pathElement = createSvgElement("path", { class: "airport-route active", d: route.d });
@@ -2523,15 +2571,34 @@
 
       const nextPositions = {};
       routeEntries.forEach(({ flight, route }) => {
-        const progress = tripProgress(flight, referenceMinutes);
+        const progress = airportFlightProgress(flight, referenceMinutes);
         const pathProgress = flight.type === "arrival" ? 1 - progress : progress;
-        const point = airportPointOnRoute(route, pathProgress);
+        const point = airportPointOnRoute(route, pathProgress, flight.type);
         const previous = state.movementMarkerPositions[flight.id] || point;
         nextPositions[flight.id] = point;
         svg.appendChild(createAirportPlaneMarker(flight, previous, point, route.angle));
       });
       state.movementMarkerPositions = nextPositions;
       els.movementStage.appendChild(svg);
+    }
+
+    function getAirportSchemaFlights(airport, referenceMinutes) {
+      if (!airport) return [];
+      const visibleFlights = state.visibleTrains.filter(flight => flight.airportId === airport.id);
+      const visibleIds = new Set(visibleFlights.map(flight => flight.id));
+      const recentMovements = getEffectiveFlights()
+        .filter(isValidFlight)
+        .filter(flight => flight.airportId === airport.id)
+        .filter(flight => {
+          const effective = effectiveTimeToMinutes(flight);
+          const exitMinutes = flight.type === "departure"
+            ? AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES
+            : AIRPORT_ARRIVAL_SCHEMA_EXIT_MINUTES;
+          return effective <= referenceMinutes && referenceMinutes < effective + exitMinutes;
+        })
+        .filter(flight => !visibleIds.has(flight.id))
+        .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b));
+      return visibleFlights.concat(recentMovements);
     }
 
     function buildAirportGatePositions(gates) {
@@ -2609,10 +2676,22 @@
       };
     }
 
-    function airportPointOnRoute(route, progress) {
+    function airportPointOnRoute(route, progress, tripType) {
+      if (tripType === "departure" && progress > 1) return airportPointPastRunway(route, progress);
       const length = route.pathElement.getTotalLength();
       const point = route.pathElement.getPointAtLength(length * Math.max(0, Math.min(1, progress)));
       return { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+    }
+
+    function airportPointPastRunway(route, progress) {
+      const angle = ((route.angle || 0) * Math.PI) / 180;
+      const distance = Math.min(progress - 1, 0.2) * 60;
+      const x = route.departureEnd.x + Math.cos(angle) * distance;
+      const y = route.departureEnd.y + Math.sin(angle) * distance;
+      return {
+        x: Math.round(Math.max(2, Math.min(98, x)) * 100) / 100,
+        y: Math.round(Math.max(2, Math.min(98, y)) * 100) / 100
+      };
     }
 
     function createAirportPlaneMarker(flight, previous, point, routeAngle) {
@@ -2676,6 +2755,31 @@
       return Math.max(0, Math.min(1, (referenceMinutes - windowStart) / Math.max(1, windowEnd - windowStart)));
     }
 
+    function airportFlightProgress(flight, referenceMinutes) {
+      const effective = effectiveTimeToMinutes(flight);
+      if (flight.type === "arrival") {
+        if (referenceMinutes <= effective - 12) return 0;
+        if (referenceMinutes <= effective) return interpolateRange(referenceMinutes, effective - 12, effective, 0.05, 0.35);
+        if (referenceMinutes <= effective + 8) return interpolateRange(referenceMinutes, effective, effective + 8, 0.35, 1);
+        return 1;
+      }
+
+      if (referenceMinutes <= effective - 18) return 0.06;
+      if (referenceMinutes <= effective - 5) return interpolateRange(referenceMinutes, effective - 18, effective - 5, 0.06, 0.2);
+      if (referenceMinutes <= effective) return interpolateRange(referenceMinutes, effective - 5, effective, 0.2, 0.42);
+      if (referenceMinutes <= effective + 3) return interpolateRange(referenceMinutes, effective, effective + 3, 0.42, 0.96);
+      if (referenceMinutes <= effective + AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES) {
+        return interpolateRange(referenceMinutes, effective + 3, effective + AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES, 1.02, 1.18);
+      }
+      return 1.18;
+    }
+
+    function interpolateRange(value, start, end, from, to) {
+      if (end <= start) return to;
+      const ratio = Math.max(0, Math.min(1, (value - start) / (end - start)));
+      return from + (to - from) * ratio;
+    }
+
     function getVisibleRows(referenceMinutes) {
       const selected = getEffectiveTrips()
         .filter(isValidTrip)
@@ -2704,6 +2808,7 @@
       const referenceMinutes = getReferenceMinutes();
       const nextRows = getVisibleRows(referenceMinutes);
       const departingTrain = findDepartingTrain(previousTrains, nextRows, referenceMinutes);
+      checkAutomaticDepartures(referenceMinutes);
       renderAll(forceFlip);
       if (departingTrain) openDepartureZoom(departingTrain);
     }
@@ -2717,6 +2822,40 @@
         !nextIds.has(train.id) &&
         departureVisibleUntil(train) <= referenceMinutes
       )) || null;
+    }
+
+    function resetDepartureAnnouncementClock() {
+      state.lastDepartureCheckMinutes = getReferenceMinutes();
+    }
+
+    function checkAutomaticDepartures(referenceMinutes) {
+      const previousMinutes = state.lastDepartureCheckMinutes;
+      state.lastDepartureCheckMinutes = referenceMinutes;
+      if (previousMinutes === null || previousMinutes >= referenceMinutes) return null;
+      const dueTrip = getEffectiveTrips()
+        .filter(isValidTrip)
+        .filter(trip => trip.type === "departure")
+        .filter(isTripAtActiveLocation)
+        .filter(trip => {
+          const effective = effectiveTimeToMinutes(trip);
+          return previousMinutes < effective && effective <= referenceMinutes;
+        })
+        .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b))
+        .find(trip => !state.announcedDepartureKeys.includes(departureAnnouncementKey(trip)));
+      if (!dueTrip) return null;
+      state.announcedDepartureKeys.push(departureAnnouncementKey(dueTrip));
+      announceTrip(dueTrip);
+      return dueTrip;
+    }
+
+    function isTripAtActiveLocation(trip) {
+      return state.mode === "airport"
+        ? trip.airportId === state.airportId
+        : trip.stationId === state.stationId;
+    }
+
+    function departureAnnouncementKey(trip) {
+      return `${state.mode}:${trip.id}:${effectiveTimeToMinutes(trip)}`;
     }
 
     function getReferenceMinutes() {
@@ -3675,7 +3814,7 @@
       const effective = effectiveTimeToMinutes(flight);
       const delta = effective - referenceMinutes;
       if (flight.type === "arrival") {
-        if (delta < -8) return "Arrived";
+        if (delta <= -8) return "Arrived";
         if (delta <= 0) return "Landed";
         if (delta <= 12) return "On approach";
         return "Expected";
