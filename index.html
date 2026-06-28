@@ -1061,14 +1061,16 @@
 
     .design-retro .cell {
       display: flex;
-      gap: 2px;
+      gap: 1px;
       align-items: center;
     }
 
     .flap-char {
       position: relative;
       display: inline-block;
-      width: clamp(10px, 1.55vw, 16px);
+      width: auto;
+      min-width: 7px;
+      max-width: 16px;
       height: 28px;
       line-height: 28px;
       text-align: center;
@@ -1081,7 +1083,7 @@
       font-weight: 900;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.85);
       transform-style: preserve-3d;
-      flex: 0 0 auto;
+      flex: 1 1 0;
     }
 
     .flap-char::after {
@@ -1198,7 +1200,8 @@
       }
 
       .flap-char {
-        width: 9px;
+        min-width: 5px;
+        max-width: 9px;
         height: 24px;
         line-height: 24px;
         font-size: 0.68rem;
@@ -2192,13 +2195,14 @@
     }
 
     function appendTripCells(row, train, shouldFlip, referenceMinutes) {
+      const delayClass = (state.mode === "airport" ? hasSignificantFlightDelay(train) : hasPositiveDelay(train)) ? "positive" : "neutral";
       const values = [
         { text: train.scheduledTime, className: "time-cell", length: 5 },
         { text: tripLabel(train), className: "line-cell", length: 9 },
         { text: displayDirection(train), className: "direction-cell", length: 23 },
         { text: state.mode === "airport" ? (train.gate || "-") : (train.platform || "-"), className: "platform-cell", length: 5 },
         { text: displayStatus(train, referenceMinutes), className: "status-cell", length: 16 },
-        { text: delayText(train), className: `delay-cell delay ${train.delayMinutes > 0 ? "positive" : "neutral"}`, length: 7 }
+        { text: delayText(train), className: `delay-cell delay ${delayClass}`, length: 7 }
       ];
       values.forEach(value => row.appendChild(createCell(value.text, value.className, value.length, shouldFlip)));
     }
@@ -2223,7 +2227,8 @@
         return cell;
       }
 
-      const normalized = String(text || " ").padEnd(length, " ").slice(0, length);
+      const normalizedLength = retroCellLength(className, length);
+      const normalized = String(text || " ").padEnd(normalizedLength, " ").slice(0, normalizedLength);
       Array.from(normalized).forEach((char, charIndex) => {
         const flap = document.createElement("span");
         flap.className = "flap-char";
@@ -2232,6 +2237,11 @@
         cell.appendChild(flap);
       });
       return cell;
+    }
+
+    function retroCellLength(className, length) {
+      if (className.includes("status-cell") && window.matchMedia("(max-width: 640px)").matches) return Math.min(length, 10);
+      return length;
     }
 
     function animateRetroRow(row, shouldFlip, rowIndex) {
@@ -2250,10 +2260,14 @@
       const finalChar = flap.dataset.final;
       const delay = charIndex * animationMs(BASE_FLIP_CHAR_DELAY_MS);
       const timer = window.setTimeout(() => {
-        if (runId !== state.animationRunId) return;
+        if (runId !== state.animationRunId) {
+          finishFlap(flap);
+          return;
+        }
         let count = 0;
         const interval = window.setInterval(() => {
           if (runId !== state.animationRunId) {
+            finishFlap(flap);
             window.clearInterval(interval);
             return;
           }
@@ -2263,6 +2277,7 @@
           flap.textContent = count < FLIP_TURNS ? FLIP_CHARS[Math.floor(Math.random() * FLIP_CHARS.length)] : finalChar;
           count += 1;
           if (count > FLIP_TURNS) {
+            finishFlap(flap);
             window.clearInterval(interval);
             const cleanupTimer = window.setTimeout(() => {
               if (runId === state.animationRunId) flap.classList.remove("flip");
@@ -2273,6 +2288,11 @@
         state.animationTimers.push(interval);
       }, delay);
       state.animationTimers.push(timer);
+    }
+
+    function finishFlap(flap) {
+      flap.textContent = flap.dataset.final || " ";
+      flap.classList.remove("flip");
     }
 
     function animationMs(baseMs) {
@@ -2314,6 +2334,7 @@
     }
 
     function clearAnimationTimers() {
+      document.querySelectorAll(".flap-char").forEach(finishFlap);
       state.animationRunId += 1;
       state.animationTimers.forEach(timer => {
         window.clearTimeout(timer);
@@ -2695,7 +2716,7 @@
     }
 
     function createAirportPlaneMarker(flight, previous, point, routeAngle) {
-      const alert = Number(flight.delayMinutes || 0) >= 45 || /cancel|alert|divert/i.test(flight.status || "");
+      const alert = hasSignificantFlightDelay(flight) || /cancel|alert|divert/i.test(flight.status || "");
       const angle = (flight.type === "arrival" ? routeAngle + 180 : routeAngle) || 0;
       const marker = createSvgElement("g", {
         class: `airport-plane-marker ${flight.type}${alert ? " alert" : ""}`,
@@ -2785,9 +2806,12 @@
         .filter(isValidTrip)
         .filter(train => (state.mode === "airport" ? train.airportId === state.airportId : train.stationId === state.stationId))
         .filter(train => train.type === state.boardType)
-        .filter(train => train.type === "departure"
-          ? departureVisibleUntil(train) > referenceMinutes
-          : effectiveTimeToMinutes(train) >= referenceMinutes)
+        .filter(train => {
+          if (state.mode === "airport") return isAirportFlightVisible(train, referenceMinutes);
+          return train.type === "departure"
+            ? departureVisibleUntil(train) > referenceMinutes
+            : effectiveTimeToMinutes(train) >= referenceMinutes;
+        })
         .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b))
         .slice(0, APP_CONFIG.settings.rowCount);
 
@@ -2798,8 +2822,7 @@
     function buildVisibleSignature() {
       const referenceMinutes = getReferenceMinutes();
       return getVisibleRows(referenceMinutes)
-        .filter(Boolean)
-        .map(train => `${train.id}:${displayStatus(train, referenceMinutes)}`)
+        .map(train => train ? `${train.id}:${train.scheduledTime}:${train.delayMinutes}:${displayStatus(train, referenceMinutes)}` : "empty")
         .join("|");
     }
 
@@ -2815,12 +2838,11 @@
 
     function findDepartingTrain(previousTrains, nextRows, referenceMinutes) {
       if (state.boardType !== "departure") return null;
-      const nextIds = new Set(nextRows.filter(Boolean).map(train => train.id));
       return previousTrains.find(train => (
         train &&
         train.type === "departure" &&
-        !nextIds.has(train.id) &&
-        departureVisibleUntil(train) <= referenceMinutes
+        !state.announcedDepartureKeys.includes(departureAnnouncementKey(train)) &&
+        departureEventTime(train) <= referenceMinutes
       )) || null;
     }
 
@@ -2837,10 +2859,10 @@
         .filter(trip => trip.type === "departure")
         .filter(isTripAtActiveLocation)
         .filter(trip => {
-          const effective = effectiveTimeToMinutes(trip);
+          const effective = departureEventTime(trip);
           return previousMinutes < effective && effective <= referenceMinutes;
         })
-        .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b))
+        .sort((a, b) => departureEventTime(a) - departureEventTime(b))
         .find(trip => !state.announcedDepartureKeys.includes(departureAnnouncementKey(trip)));
       if (!dueTrip) return null;
       state.announcedDepartureKeys.push(departureAnnouncementKey(dueTrip));
@@ -3811,19 +3833,57 @@
     }
 
     function computeFlightStatus(flight, referenceMinutes) {
+      const override = flightStatusOverride(flight.status);
+      if (override) return override;
+
       const effective = effectiveTimeToMinutes(flight);
       const delta = effective - referenceMinutes;
       if (flight.type === "arrival") {
-        if (delta <= -8) return "Arrived";
+        if (delta < -45) return "Arrived";
+        if (delta <= -11) return "Arrived";
         if (delta <= 0) return "Landed";
-        if (delta <= 12) return "On approach";
-        return "Expected";
+        if (delta <= 10) return "On approach";
+        if (delta <= 30) return "Expected";
+        if (delta <= 90) return "En route";
+        return "Scheduled";
       }
-      if (delta < -3) return "Departed";
+      if (delta < -10) return "Departed";
       if (delta <= 0) return "Taxiing";
-      if (delta <= 5) return "Final call";
-      if (delta <= 18) return "Boarding";
-      return "Gate open";
+      if (delta <= 15) return "Gate closed";
+      if (delta <= 20) return "Final call";
+      if (delta <= 50) return "Boarding";
+      if (delta <= 60) return "Gate open";
+      if (delta <= 120) return "Check-in";
+      return "Scheduled";
+    }
+
+    function flightStatusOverride(status) {
+      const normalized = String(status || "").trim().toLowerCase();
+      if (!normalized) return "";
+      if (/\bcancelled\b|\bcanceled\b/.test(normalized)) return "Cancelled";
+      if (/\bdiverted\b/.test(normalized)) return "Diverted";
+      return "";
+    }
+
+    function hasSignificantFlightDelay(flight) {
+      return state.mode === "airport" && Number(flight.delayMinutes || 0) >= 15;
+    }
+
+    function hasPositiveDelay(train) {
+      return Number(train.delayMinutes || 0) > 0;
+    }
+
+    function isAirportFlightVisible(flight, referenceMinutes) {
+      const effective = effectiveTimeToMinutes(flight);
+      if (flight.type === "departure") return referenceMinutes < effective + 30;
+      return referenceMinutes < effective + 60;
+    }
+
+    function tripVisibleUntil(trip) {
+      if (state.mode === "airport") {
+        return effectiveTimeToMinutes(trip) + (trip.type === "departure" ? 30 : 60);
+      }
+      return effectiveTimeToMinutes(trip);
     }
 
     function delayText(train) {
@@ -3835,6 +3895,10 @@
     }
 
     function departureVisibleUntil(trip) {
+      return tripVisibleUntil(trip);
+    }
+
+    function departureEventTime(trip) {
       return effectiveTimeToMinutes(trip);
     }
 
