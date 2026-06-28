@@ -6,6 +6,7 @@ This repository is a static single-page app. The main application lives in `inde
 * **USE** uv (package manager) for all things python
 * use windows command line commands
 
+
 ## Build, Test, and Development Commands
 There is no package-based build step.
 
@@ -29,7 +30,8 @@ Follow the existing style in `index.html`:
 
 ## Testing Guidelines
 There is no automated test suite yet. Validate changes manually in a browser:
-
+- always just open .html no need for server, page is static
+- use *playwright* to test
 - confirm the page loads without console errors
 - exercise both train and airport modes
 - verify import/export and local state persistence after reload
