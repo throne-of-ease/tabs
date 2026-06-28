@@ -597,7 +597,7 @@
     }
 
     .airport-plane-marker {
-      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.42));
+      filter: drop-shadow(0 1px 1.2px rgba(0, 0, 0, 0.62));
     }
 
     .airport-plane-marker .plane-disc {
@@ -609,23 +609,7 @@
     }
 
     .airport-plane-marker .plane-icon {
-      fill: #f4c542;
-      stroke: rgba(0, 0, 0, 0.48);
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .airport-plane-marker .plane-icon {
-      stroke-width: 0.55;
-    }
-
-    .airport-plane-marker.arrival .plane-icon {
-      fill: #f4c542;
-      stroke: rgba(0, 0, 0, 0.48);
-    }
-
-    .airport-plane-marker.alert .plane-icon {
-      fill: var(--red);
+      overflow: hidden;
     }
 
     .airport-plane-marker text {
@@ -695,7 +679,7 @@
     }
 
     body.play-mode .board-layout:not(.schema-hidden) .row-grid {
-      grid-template-columns: minmax(54px, 0.55fr) minmax(72px, 0.72fr) minmax(116px, 1.38fr) minmax(48px, 0.5fr) minmax(104px, 1.12fr) minmax(58px, 0.58fr);
+      grid-template-columns: minmax(70px, 0.62fr) minmax(72px, 0.72fr) minmax(108px, 1.32fr) minmax(48px, 0.5fr) minmax(98px, 1.06fr) minmax(58px, 0.58fr);
       gap: clamp(4px, 0.55vw, 8px);
     }
 
@@ -822,7 +806,7 @@
 
     .row-grid {
       display: grid;
-      grid-template-columns: minmax(78px, 0.66fr) minmax(100px, 0.84fr) minmax(190px, 1.82fr) minmax(76px, 0.62fr) minmax(180px, 1.5fr) minmax(92px, 0.78fr);
+      grid-template-columns: minmax(104px, 0.82fr) minmax(100px, 0.82fr) minmax(176px, 1.68fr) minmax(76px, 0.62fr) minmax(168px, 1.4fr) minmax(92px, 0.78fr);
       gap: 12px;
       align-items: center;
     }
@@ -1132,7 +1116,7 @@
       }
 
       .row-grid {
-        grid-template-columns: minmax(72px, 0.7fr) minmax(88px, 0.82fr) minmax(138px, 1.55fr) minmax(64px, 0.62fr) minmax(136px, 1.35fr) minmax(78px, 0.72fr);
+        grid-template-columns: minmax(98px, 0.88fr) minmax(88px, 0.8fr) minmax(124px, 1.4fr) minmax(64px, 0.62fr) minmax(124px, 1.24fr) minmax(78px, 0.72fr);
         gap: 8px;
       }
 
@@ -1194,7 +1178,7 @@
       }
 
       .row-grid {
-        grid-template-columns: 62px 72px minmax(0, 1fr);
+        grid-template-columns: 70px 72px minmax(0, 1fr);
         gap: 6px;
       }
 
@@ -1575,8 +1559,49 @@
     const VALID_CLOCK_MODES = ["real", "manual", "accelerated"];
     const SVG_NS = "http://www.w3.org/2000/svg";
     const AIRPORT_SCHEMA_FLIGHT_LIMIT = 5;
+    const AIRCRAFT_SPRITE_ASSET = "aircraft-icons-transparent.png";
+    const AIRCRAFT_SPRITE_SHEET = { width: 192, height: 64 };
+    const AIRCRAFT_SPRITE_FRAMES = {
+      narrowbody: { x: 0, y: 0, width: 64, height: 64, markerWidth: 7.8, markerHeight: 7.8 },
+      widebody: { x: 64, y: 0, width: 64, height: 64, markerWidth: 8.8, markerHeight: 8.8 },
+      large: { x: 128, y: 0, width: 64, height: 64, markerWidth: 9.8, markerHeight: 9.8 }
+    };
+    const AIRCRAFT_TYPE_SPRITE_MAP = {
+      A220: "narrowbody",
+      A320: "narrowbody",
+      B737: "narrowbody",
+      A350: "widebody",
+      B747: "large",
+      B748: "large",
+      A340: "large",
+      A380: "large",
+      "IL-96": "large",
+      "AN-124": "large",
+      "AN-225": "large"
+    };
     const AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES = 7;
     const AIRPORT_ARRIVAL_SCHEMA_EXIT_MINUTES = 11;
+    const AIRPORT_DEPARTED_MAP_HIDE_MS = 5000;
+    const AIRPORT_KNOWN_STATUSES = {
+      "scheduled": "Scheduled",
+      "check-in": "Check-in",
+      "check in": "Check-in",
+      "gate open": "Gate open",
+      "boarding": "Boarding",
+      "final call": "Final call",
+      "gate closed": "Gate closed",
+      "taxiing": "Taxiing",
+      "departed": "Departed",
+      "expected": "Expected",
+      "en route": "En route",
+      "enroute": "En route",
+      "on approach": "On approach",
+      "landed": "Landed",
+      "arrived": "Arrived",
+      "cancelled": "Cancelled",
+      "canceled": "Cancelled",
+      "diverted": "Diverted"
+    };
     const STATION_ROUTE_TEMPLATES = [
       { id: "west-north", y: 26, edgeX: 8, edgeY: 18, c1x: 39, c1y: 32, c2x: 24, c2y: 20, labelX: 9, labelY: 13, direction: "Sever" },
       { id: "west-main", y: 39, edgeX: 7, edgeY: 42, c1x: 38, c1y: 45, c2x: 22, c2y: 42, labelX: 9, labelY: 49, direction: "Zapad" },
@@ -1628,6 +1653,8 @@
       animationRunId: 0,
       animationTimers: [],
       movementMarkerPositions: {},
+      departedMapSeenAt: {},
+      departedMapTimers: {},
       lastAnnouncementText: "",
       announcedDepartureKeys: [],
       lastDepartureCheckMinutes: null,
@@ -2289,10 +2316,18 @@
           flaps.length,
           Math.floor((availableWidth + gap) / (flapWidth + gap))
         ));
+        const minVisibleCount = minimumVisibleRetroFlaps(cell, flaps);
+        const safeVisibleCount = Math.max(visibleCount, minVisibleCount);
         flaps.forEach((flap, index) => {
-          flap.classList.toggle("fit-hidden", index >= visibleCount);
+          flap.classList.toggle("fit-hidden", index >= safeVisibleCount);
         });
       });
+    }
+
+    function minimumVisibleRetroFlaps(cell, flaps) {
+      if (!cell.classList.contains("time-cell")) return 0;
+      const value = flaps.map(flap => flap.dataset.final || " ").join("");
+      return /^(\d{2}:\d{2}|--:--)$/.test(value) ? Math.min(5, flaps.length) : 0;
     }
 
     function animateRetroRow(row, shouldFlip, rowIndex) {
@@ -2585,6 +2620,12 @@
         svg.appendChild(createSvgElement("rect", { class: "airport-terminal-core", x: terminal.x + 3, y: terminal.y + terminal.height / 2 - 1.8, width: Math.max(8, terminal.width - 6), height: 3.6, rx: 1.1 }));
         svg.appendChild(createSvgText(terminal.label, terminal.x + 2, terminal.y + terminal.height + 5, "direction-label"));
       });
+      (template.taxiways || []).forEach(taxiway => {
+        svg.appendChild(createSvgElement("path", {
+          class: "airport-taxiway",
+          d: taxiway.d
+        }));
+      });
 
       gatePositions.forEach(position => {
         const active = activeGateIds.has(position.gate);
@@ -2624,7 +2665,7 @@
         const gate = flight.gate || gates[index % gates.length];
         const gatePoint = gatePositions.find(position => position.gate === gate) || gatePositions[index % gatePositions.length];
         const gateIndex = Math.max(0, gatePositions.findIndex(position => position.gate === gatePoint.gate));
-        const runway = template.runways[gateIndex % template.runways.length];
+        const runway = selectAirportRunway(template, flight, gateIndex);
         const runwayPoint = runway.routePoints[gateIndex % runway.routePoints.length];
         const route = {
           id: `${flight.id}-${gatePoint.gate}`,
@@ -2643,7 +2684,8 @@
 
       const nextPositions = {};
       routeEntries.forEach(({ flight, route }) => {
-        const progress = airportFlightProgress(flight, referenceMinutes);
+        const status = normalizedFlightStatus(flight, referenceMinutes);
+        const progress = airportFlightProgress(flight, referenceMinutes, status);
         const pathProgress = flight.type === "arrival" ? 1 - progress : progress;
         const point = airportPointOnRoute(route, pathProgress, flight.type);
         const previous = state.movementMarkerPositions[flight.id] || point;
@@ -2670,7 +2712,7 @@
         })
         .filter(flight => !visibleIds.has(flight.id))
         .sort((a, b) => effectiveTimeToMinutes(a) - effectiveTimeToMinutes(b));
-      return visibleFlights.concat(recentMovements);
+      return visibleFlights.concat(recentMovements).filter(flight => isAirportFlightMapVisible(flight, referenceMinutes));
     }
 
     function buildAirportGatePositions(gates) {
@@ -2681,33 +2723,69 @@
       }));
     }
 
+    function selectAirportRunway(template, flight, gateIndex) {
+      const runways = Array.isArray(template.runways) && template.runways.length ? template.runways : [];
+      const eligible = runways.filter(runway => isRunwayEligibleForFlight(runway, flight));
+      const fallback = flight.type === "arrival"
+        ? runways.filter(runway => !isRunway18(runway))
+        : runways;
+      const candidates = eligible.length ? eligible : (fallback.length ? fallback : runways);
+      return candidates[gateIndex % candidates.length];
+    }
+
+    function isRunwayEligibleForFlight(runway, flight) {
+      return flight.type === "arrival" ? isRunwayEligibleForArrival(runway) : isRunwayEligibleForDeparture(runway);
+    }
+
+    function isRunwayEligibleForArrival(runway) {
+      return !isRunway18(runway);
+    }
+
+    function isRunwayEligibleForDeparture(runway) {
+      return Boolean(runway);
+    }
+
+    function isRunway18(runway) {
+      return String(runway && runway.label || "").trim() === "18";
+    }
+
     function getAirportMapTemplate(airport, gates) {
       if (airport && airport.id === "frankfurt") {
         return {
           grid: [20, 40, 60, 80],
           aprons: [
-            { x: 19, y: 25, width: 45, height: 20 },
-            { x: 61, y: 28, width: 18, height: 15 },
-            { x: 44, y: 51, width: 20, height: 10 }
+            { x: 17, y: 31, width: 43, height: 16 },
+            { x: 57, y: 36, width: 21, height: 12 },
+            { x: 42, y: 54, width: 22, height: 10 },
+            { x: 27, y: 47, width: 38, height: 7 }
           ],
           terminals: [
-            { x: 22, y: 30, width: 29, height: 10, label: "T1 A/B/Z" },
-            { x: 64, y: 31, width: 12, height: 9, label: "T2 D/E" },
-            { x: 48, y: 53, width: 12, height: 7, label: "T3" }
+            { x: 22, y: 35, width: 29, height: 8.5, label: "T1 A/B/Z" },
+            { x: 62, y: 39, width: 12, height: 7.5, label: "T2 D/E" },
+            { x: 48, y: 56, width: 12, height: 6.5, label: "T3" }
+          ],
+          taxiways: [
+            { d: "M 14 23 L 88 23" },
+            { d: "M 13 66 L 88 66" },
+            { d: "M 13 81 L 88 81" },
+            { d: "M 22 45 C 34 51, 48 51, 62 47" },
+            { d: "M 35 31 C 38 27, 46 25, 57 24" },
+            { d: "M 52 54 C 47 62, 43 70, 40 81" },
+            { d: "M 21 42 C 17 48, 15 57, 14 73" }
           ],
           gates: [
-            { gate: "A18", x: 24, y: 25 },
-            { gate: "B24", x: 38, y: 25 },
-            { gate: "C7", x: 56, y: 44 },
-            { gate: "Z52", x: 48, y: 26 }
+            { gate: "A18", x: 25, y: 31 },
+            { gate: "B24", x: 39, y: 31 },
+            { gate: "C7", x: 58, y: 50 },
+            { gate: "Z52", x: 49, y: 31 }
           ].concat(buildAirportGatePositions(gates).filter(position => !["A18", "B24", "C7", "Z52"].includes(position.gate))),
           runways: [
-            { label: "07L/25R", x: 11, y: 12, width: 78, height: 5.4, labelX: 13, labelY: 10, angle: 0, routePoints: [{ x1: 15, y1: 14.7, x2: 85, y2: 14.7, cx: 47, cy: 23 }] },
-            { label: "07C/25C", x: 10, y: 68, width: 78, height: 5.8, labelX: 12, labelY: 66, angle: 0, routePoints: [{ x1: 15, y1: 70.9, x2: 84, y2: 70.9, cx: 55, cy: 57 }] },
-            { label: "07R/25L", x: 10, y: 84, width: 78, height: 5.8, labelX: 12, labelY: 82, angle: 0, routePoints: [{ x1: 15, y1: 86.9, x2: 84, y2: 86.9, cx: 55, cy: 73 }] },
-            { label: "18", x: 10, y: 36, width: 6, height: 45, labelX: 18, labelY: 41, angle: 90, routePoints: [{ x1: 13, y1: 40, x2: 13, y2: 78, cx: 24, cy: 55 }] }
+            { label: "07L/25R", x: 10, y: 16, width: 80, height: 5.2, labelX: 12, labelY: 14, angle: 0, routePoints: [{ x1: 14, y1: 18.6, x2: 86, y2: 18.6, cx: 48, cy: 24 }] },
+            { label: "07C/25C", x: 10, y: 62, width: 80, height: 5.4, labelX: 12, labelY: 60, angle: 0, routePoints: [{ x1: 14, y1: 64.7, x2: 86, y2: 64.7, cx: 57, cy: 55 }] },
+            { label: "07R/25L", x: 10, y: 78, width: 80, height: 5.4, labelX: 12, labelY: 76, angle: 0, routePoints: [{ x1: 14, y1: 80.7, x2: 86, y2: 80.7, cx: 55, cy: 70 }] },
+            { label: "18", x: 11, y: 34, width: 5.4, height: 41, labelX: 18, labelY: 38, angle: 90, routePoints: [{ x1: 13.7, y1: 38, x2: 13.7, y2: 72, cx: 22, cy: 54 }] }
           ],
-          routeHub: { x: 51, y: 50 }
+          routeHub: { x: 51, y: 49 }
         };
       }
 
@@ -2768,25 +2846,35 @@
 
     function createAirportPlaneMarker(flight, previous, point, routeAngle) {
       const alert = hasSignificantFlightDelay(flight) || /cancel|alert|divert/i.test(flight.status || "");
-      const angle = (flight.type === "arrival" ? routeAngle + 180 : routeAngle) || 0;
+      const angle = ((flight.type === "arrival" ? routeAngle + 180 : routeAngle) || 0) + 90;
+      const frame = getAircraftSpriteFrame(flight);
       const marker = createSvgElement("g", {
         class: `airport-plane-marker ${flight.type}${alert ? " alert" : ""}`,
         transform: `translate(${point.x} ${point.y})`
       });
       marker.appendChild(createSvgElement("title", {})).textContent = `${tripLabel(flight)} ${displayDirection(flight)}`;
-      const icon = createSvgElement("g", { transform: `rotate(${angle}) scale(0.75)` });
-      icon.appendChild(createSvgElement("path", {
-        class: "plane-icon",
-        d: "M -4.6 0.15 L -1.2 -0.3 L 0.7 -3.9 L 1.5 -3.9 L 0.7 0.0 L 4.7 0.0 L 5.1 0.5 L 0.7 1.0 L 1.5 4.8 L 0.7 4.8 L -1.2 1.15 L -4.6 0.7 Z"
-      }));
-      getAircraftEngineOffsets(flight).forEach(([x, y]) => {
-        icon.appendChild(createSvgElement("circle", {
-          class: "plane-icon",
-          cx: x,
-          cy: y,
-          r: 0.55
-        }));
+      const icon = createSvgElement("g", {
+        transform: `rotate(${angle})`
       });
+      const spriteViewport = createSvgElement("svg", {
+        class: "plane-icon",
+        x: -frame.markerWidth / 2,
+        y: -frame.markerHeight / 2,
+        width: frame.markerWidth,
+        height: frame.markerHeight,
+        viewBox: `${frame.x} ${frame.y} ${frame.width} ${frame.height}`,
+        preserveAspectRatio: "xMidYMid meet",
+        overflow: "hidden"
+      });
+      spriteViewport.appendChild(createSvgElement("image", {
+        href: AIRCRAFT_SPRITE_ASSET,
+        x: 0,
+        y: 0,
+        width: AIRCRAFT_SPRITE_SHEET.width,
+        height: AIRCRAFT_SPRITE_SHEET.height,
+        preserveAspectRatio: "none"
+      }));
+      icon.appendChild(spriteViewport);
       marker.appendChild(icon);
       marker.appendChild(createSvgText(shortTripCode(flight), 0, 10.0, ""));
 
@@ -2806,16 +2894,10 @@
       return marker;
     }
 
-    function getAircraftEngineOffsets(flight) {
-      const engines = getAircraftEngineCount(flight);
-      if (engines >= 4) return [[-0.8, -2.1], [0.25, -2.6], [-0.8, 2.1], [0.25, 2.6]];
-      return [[-0.6, -2.25], [-0.6, 2.25]];
-    }
-
-    function getAircraftEngineCount(flight) {
+    function getAircraftSpriteFrame(flight) {
       const model = `${flight.aircraftType || ""} ${flight.aircraftModel || ""}`.toUpperCase();
-      if (/\b(747|A340|A380|IL-96|AN-124|AN-225)\b/.test(model)) return 4;
-      return 2;
+      const spriteEntry = Object.entries(AIRCRAFT_TYPE_SPRITE_MAP).find(([type]) => model.includes(type));
+      return AIRCRAFT_SPRITE_FRAMES[spriteEntry ? spriteEntry[1] : "narrowbody"];
     }
 
     function tripProgress(trip, referenceMinutes) {
@@ -2827,7 +2909,7 @@
       return Math.max(0, Math.min(1, (referenceMinutes - windowStart) / Math.max(1, windowEnd - windowStart)));
     }
 
-    function airportFlightProgress(flight, referenceMinutes) {
+    function airportFlightProgress(flight, referenceMinutes, status) {
       const effective = effectiveTimeToMinutes(flight);
       if (flight.type === "arrival") {
         if (referenceMinutes <= effective - 12) return 0;
@@ -2836,14 +2918,47 @@
         return 1;
       }
 
-      if (referenceMinutes <= effective - 18) return 0.06;
-      if (referenceMinutes <= effective - 5) return interpolateRange(referenceMinutes, effective - 18, effective - 5, 0.06, 0.2);
-      if (referenceMinutes <= effective) return interpolateRange(referenceMinutes, effective - 5, effective, 0.2, 0.42);
-      if (referenceMinutes <= effective + 3) return interpolateRange(referenceMinutes, effective, effective + 3, 0.42, 0.96);
-      if (referenceMinutes <= effective + AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES) {
-        return interpolateRange(referenceMinutes, effective + 3, effective + AIRPORT_DEPARTURE_SCHEMA_EXIT_MINUTES, 1.02, 1.18);
+      if (isFlightDeparted(status)) {
+        return interpolateRange(departedMapElapsedMs(flight.id), 0, AIRPORT_DEPARTED_MAP_HIDE_MS, 1.02, 1.18);
       }
-      return 1.18;
+      if (!isFlightTaxiing(status)) return 0;
+      if (referenceMinutes <= effective - 5) return 0.15;
+      if (referenceMinutes <= effective) return interpolateRange(referenceMinutes, effective - 5, effective, 0.15, 0.42);
+      if (referenceMinutes <= effective + 3) return interpolateRange(referenceMinutes, effective, effective + 3, 0.42, 0.96);
+      return 0.96;
+    }
+
+    function isAirportFlightMapVisible(flight, referenceMinutes) {
+      const status = normalizedFlightStatus(flight, referenceMinutes);
+      if (flight.type !== "departure" || !isFlightDeparted(status)) {
+        deleteDepartedMapState(flight.id);
+        return true;
+      }
+      return departedMapElapsedMs(flight.id) <= AIRPORT_DEPARTED_MAP_HIDE_MS;
+    }
+
+    function departedMapElapsedMs(flightId) {
+      if (!state.departedMapSeenAt[flightId]) {
+        state.departedMapSeenAt[flightId] = Date.now();
+        scheduleDepartedMapRefresh(flightId);
+      }
+      return Date.now() - state.departedMapSeenAt[flightId];
+    }
+
+    function scheduleDepartedMapRefresh(flightId) {
+      if (state.departedMapTimers[flightId]) return;
+      state.departedMapTimers[flightId] = window.setTimeout(() => {
+        delete state.departedMapTimers[flightId];
+        renderAll(false);
+      }, AIRPORT_DEPARTED_MAP_HIDE_MS + 100);
+    }
+
+    function deleteDepartedMapState(flightId) {
+      delete state.departedMapSeenAt[flightId];
+      if (state.departedMapTimers[flightId]) {
+        window.clearTimeout(state.departedMapTimers[flightId]);
+        delete state.departedMapTimers[flightId];
+      }
     }
 
     function interpolateRange(value, start, end, from, to) {
@@ -3880,13 +3995,22 @@
 
     function displayStatus(trip, referenceMinutes) {
       if (state.mode !== "airport") return trip.status || defaultStatus(trip);
-      return computeFlightStatus(trip, referenceMinutes);
+      return normalizedFlightStatus(trip, referenceMinutes);
+    }
+
+    function normalizedFlightStatus(flight, referenceMinutes) {
+      const manualStatus = canonicalFlightStatus(flight.status);
+      if (manualStatus) return manualStatus;
+      return computeFlightStatus(flight, referenceMinutes);
+    }
+
+    function canonicalFlightStatus(status) {
+      const normalized = String(status || "").trim().toLowerCase().replace(/\s+/g, " ");
+      if (!normalized) return "";
+      return AIRPORT_KNOWN_STATUSES[normalized] || "";
     }
 
     function computeFlightStatus(flight, referenceMinutes) {
-      const override = flightStatusOverride(flight.status);
-      if (override) return override;
-
       const effective = effectiveTimeToMinutes(flight);
       const delta = effective - referenceMinutes;
       if (flight.type === "arrival") {
@@ -3908,12 +4032,12 @@
       return "Scheduled";
     }
 
-    function flightStatusOverride(status) {
-      const normalized = String(status || "").trim().toLowerCase();
-      if (!normalized) return "";
-      if (/\bcancelled\b|\bcanceled\b/.test(normalized)) return "Cancelled";
-      if (/\bdiverted\b/.test(normalized)) return "Diverted";
-      return "";
+    function isFlightTaxiing(status) {
+      return status === "Taxiing";
+    }
+
+    function isFlightDeparted(status) {
+      return status === "Departed";
     }
 
     function hasSignificantFlightDelay(flight) {
