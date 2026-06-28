@@ -309,7 +309,7 @@
 
     .board-layout {
       display: grid;
-      grid-template-columns: minmax(520px, var(--board-panel-size, 70fr)) 10px minmax(240px, var(--schema-panel-size, 30fr));
+      grid-template-columns: minmax(500px, var(--board-panel-size, 68fr)) 10px minmax(320px, var(--schema-panel-size, 32fr));
       gap: 16px;
       align-items: stretch;
     }
@@ -440,8 +440,8 @@
 
     .movement-stage {
       position: relative;
-      min-height: 240px;
-      aspect-ratio: 4 / 3;
+      min-height: 280px;
+      aspect-ratio: 16 / 10;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
       overflow: hidden;
@@ -521,6 +521,10 @@
     .platform-label.active,
     .airport-label.active {
       fill: var(--text);
+    }
+
+    .airport-label {
+      font-size: 2.7px;
     }
 
     .airport-apron {
@@ -615,7 +619,7 @@
     .airport-plane-marker text {
       fill: #f7f7f2;
       stroke: none;
-      font-size: 2.35px;
+      font-size: 2.1px;
       font-weight: 900;
       letter-spacing: 0;
       text-anchor: middle;
@@ -1562,9 +1566,9 @@
     const AIRCRAFT_SPRITE_ASSET = "aircraft-icons-transparent.png";
     const AIRCRAFT_SPRITE_SHEET = { width: 192, height: 64 };
     const AIRCRAFT_SPRITE_FRAMES = {
-      narrowbody: { x: 0, y: 0, width: 64, height: 64, markerWidth: 7.8, markerHeight: 7.8 },
-      widebody: { x: 64, y: 0, width: 64, height: 64, markerWidth: 8.8, markerHeight: 8.8 },
-      large: { x: 128, y: 0, width: 64, height: 64, markerWidth: 9.8, markerHeight: 9.8 }
+      narrowbody: { x: 0, y: 0, width: 64, height: 64, markerWidth: 11.7, markerHeight: 11.7 },
+      widebody: { x: 64, y: 0, width: 64, height: 64, markerWidth: 13.2, markerHeight: 13.2 },
+      large: { x: 128, y: 0, width: 64, height: 64, markerWidth: 14.7, markerHeight: 14.7 }
     };
     const AIRCRAFT_TYPE_SPRITE_MAP = {
       A220: "narrowbody",
@@ -1655,6 +1659,7 @@
       movementMarkerPositions: {},
       departedMapSeenAt: {},
       departedMapTimers: {},
+      airportTaxiMotionStartedAt: {},
       lastAnnouncementText: "",
       announcedDepartureKeys: [],
       lastDepartureCheckMinutes: null,
@@ -1894,6 +1899,7 @@
       checkAutomaticDepartures(getReferenceMinutes());
       const after = buildVisibleSignature();
       if (after !== state.visibleSignature) renderWithDepartureDetection(true);
+      else if (state.mode === "airport") renderMovementPanel();
     }
 
     function renderAll(forceFlip) {
@@ -2598,6 +2604,7 @@
       const flights = getAirportSchemaFlights(airport, referenceMinutes).slice(0, AIRPORT_SCHEMA_FLIGHT_LIMIT);
       const gatePositions = template.gates;
       const activeGateIds = new Set(flights.map((flight, index) => flight.gate || gates[index % gates.length]));
+      const deferredAirportLabels = [];
 
       const svg = createSvgElement("svg", {
         class: "station-minimap-svg airport-minimap-svg",
@@ -2618,7 +2625,14 @@
       template.terminals.forEach(terminal => {
         svg.appendChild(createSvgElement("rect", { class: "airport-terminal", x: terminal.x, y: terminal.y, width: terminal.width, height: terminal.height, rx: terminal.rx || 2.4 }));
         svg.appendChild(createSvgElement("rect", { class: "airport-terminal-core", x: terminal.x + 3, y: terminal.y + terminal.height / 2 - 1.8, width: Math.max(8, terminal.width - 6), height: 3.6, rx: 1.1 }));
-        svg.appendChild(createSvgText(terminal.label, terminal.x + 2, terminal.y + terminal.height + 5, "direction-label"));
+        if (terminal.showLabel !== false) {
+          deferredAirportLabels.push(createSvgText(
+            terminal.label,
+            terminal.labelX ?? terminal.x + 2,
+            terminal.labelY ?? terminal.y + terminal.height + 5,
+            "direction-label"
+          ));
+        }
       });
       (template.taxiways || []).forEach(taxiway => {
         svg.appendChild(createSvgElement("path", {
@@ -2636,7 +2650,14 @@
           x2: position.x + 2.8,
           y2: position.y
         }));
-        svg.appendChild(createSvgText(position.gate, position.x - 3.4, position.y - 3.6, `airport-label${active ? " active" : ""}`));
+        if (active) {
+          deferredAirportLabels.push(createSvgText(
+            position.gate,
+            position.labelX ?? position.x - 3.4,
+            position.labelY ?? position.y - 3.6,
+            "airport-label active"
+          ));
+        }
       });
 
       template.runways.forEach(runway => {
@@ -2658,39 +2679,35 @@
           y2: center,
           transform: runway.rotate ? `rotate(${runway.rotate} ${runway.x + runway.width / 2} ${center})` : null
         }));
-        svg.appendChild(createSvgText(runway.label, runway.labelX, runway.labelY, "direction-label"));
+        deferredAirportLabels.push(createSvgText(runway.label, runway.labelX, runway.labelY, "direction-label"));
       });
 
+      const gateSlotCounts = {};
       const routeEntries = flights.map((flight, index) => {
         const gate = flight.gate || gates[index % gates.length];
         const gatePoint = gatePositions.find(position => position.gate === gate) || gatePositions[index % gatePositions.length];
+        const gateSlot = gateSlotCounts[gatePoint.gate] || 0;
+        gateSlotCounts[gatePoint.gate] = gateSlot + 1;
+        const routeGatePoint = offsetAirportGatePoint(gatePoint, gateSlot);
         const gateIndex = Math.max(0, gatePositions.findIndex(position => position.gate === gatePoint.gate));
         const runway = selectAirportRunway(template, flight, gateIndex);
-        const runwayPoint = runway.routePoints[gateIndex % runway.routePoints.length];
-        const route = {
-          id: `${flight.id}-${gatePoint.gate}`,
-          gate: gatePoint.gate,
-          runwayX: flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2,
-          runwayY: flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2,
-          angle: runway.angle,
-          departureEnd: { x: runwayPoint.x2, y: runwayPoint.y2 },
-          arrivalStart: { x: runwayPoint.x1, y: runwayPoint.y1 },
-          d: `M ${gatePoint.x} ${gatePoint.y} C ${template.routeHub.x} ${template.routeHub.y}, ${runwayPoint.cx} ${runwayPoint.cy}, ${flight.type === "arrival" ? runwayPoint.x1 : runwayPoint.x2} ${flight.type === "arrival" ? runwayPoint.y1 : runwayPoint.y2}`
-        };
-        route.pathElement = createSvgElement("path", { class: "airport-route active", d: route.d });
-        svg.appendChild(route.pathElement);
+        const route = buildAirportFlightRoute(template, runway, routeGatePoint, gateIndex, flight.type);
+        route.segments.forEach(segment => {
+          segment.pathElement = createSvgElement("path", { class: "airport-route active", d: segment.d });
+          svg.appendChild(segment.pathElement);
+        });
         return { flight, route };
       });
+      deferredAirportLabels.forEach(label => svg.appendChild(label));
 
       const nextPositions = {};
       routeEntries.forEach(({ flight, route }) => {
         const status = normalizedFlightStatus(flight, referenceMinutes);
         const progress = airportFlightProgress(flight, referenceMinutes, status);
-        const pathProgress = flight.type === "arrival" ? 1 - progress : progress;
-        const point = airportPointOnRoute(route, pathProgress, flight.type);
+        const point = airportPointOnRoute(route, progress, flight.type);
         const previous = state.movementMarkerPositions[flight.id] || point;
         nextPositions[flight.id] = point;
-        svg.appendChild(createAirportPlaneMarker(flight, previous, point, route.angle));
+        svg.appendChild(createAirportPlaneMarker(flight, previous, point, point.angle || 0));
       });
       state.movementMarkerPositions = nextPositions;
       els.movementStage.appendChild(svg);
@@ -2716,11 +2733,32 @@
     }
 
     function buildAirportGatePositions(gates) {
-      return gates.map((gate, index) => ({
-        gate,
-        x: 18 + (index % 4) * 10,
-        y: 13 + Math.floor(index / 4) * 12
-      }));
+      return gates.map((gate, index) => {
+        const column = index % 4;
+        const row = Math.floor(index / 4);
+        return {
+          gate,
+          x: 18 + column * 12,
+          y: 27 + row * 11
+        };
+      });
+    }
+
+    function offsetAirportGatePoint(gatePoint, slotIndex) {
+      if (!slotIndex) return gatePoint;
+      const slotOffsets = [
+        { x: 0, y: 0 },
+        { x: 0, y: 4.8 },
+        { x: 4.8, y: 0 },
+        { x: -4.8, y: 0 },
+        { x: 0, y: -4.8 }
+      ];
+      const offset = slotOffsets[slotIndex % slotOffsets.length];
+      return {
+        gate: gatePoint.gate,
+        x: roundSvg(Math.max(6, Math.min(94, gatePoint.x + offset.x))),
+        y: roundSvg(Math.max(8, Math.min(92, gatePoint.y + offset.y)))
+      };
     }
 
     function selectAirportRunway(template, flight, gateIndex) {
@@ -2734,6 +2772,7 @@
     }
 
     function isRunwayEligibleForFlight(runway, flight) {
+      if (Array.isArray(runway && runway.usage) && runway.usage.length) return runway.usage.includes(flight.type);
       return flight.type === "arrival" ? isRunwayEligibleForArrival(runway) : isRunwayEligibleForDeparture(runway);
     }
 
@@ -2749,6 +2788,72 @@
       return String(runway && runway.label || "").trim() === "18";
     }
 
+    function buildAirportFlightRoute(template, runway, gatePoint, gateIndex, tripType) {
+      const routePoint = normalizeAirportRoutePoint(runway.routePoints[gateIndex % runway.routePoints.length]);
+      const taxiControl = routePoint.taxiControl || template.routeHub;
+      const taxiD = `M ${gatePoint.x} ${gatePoint.y} C ${taxiControl.x} ${taxiControl.y}, ${routePoint.taxiControl2.x} ${routePoint.taxiControl2.y}, ${routePoint.hold.x} ${routePoint.hold.y}`;
+      const taxiToGateD = `M ${routePoint.arrivalExit.x} ${routePoint.arrivalExit.y} C ${routePoint.taxiControl2.x} ${routePoint.taxiControl2.y}, ${taxiControl.x} ${taxiControl.y}, ${gatePoint.x} ${gatePoint.y}`;
+
+      return {
+        runway,
+        gate: gatePoint.gate,
+        segments: tripType === "arrival"
+          ? [
+              { type: "runway", start: 0, end: 0.35, d: pathLine(routePoint.arrivalStart, routePoint.arrivalExit) },
+              { type: "taxi", start: 0.35, end: 1, d: taxiToGateD }
+            ]
+          : [
+              { type: "taxi", start: 0, end: 0.42, d: taxiD },
+              { type: "lineup", start: 0.42, end: 0.5, d: pathLine(routePoint.hold, routePoint.departureStart) },
+              { type: "runway", start: 0.5, end: 0.96, d: pathLine(routePoint.departureStart, routePoint.departureEnd) },
+              { type: "exit", start: 0.96, end: 1.18, d: pathLine(routePoint.departureEnd, routePoint.exitEnd) }
+            ]
+      };
+    }
+
+    function normalizeAirportRoutePoint(routePoint) {
+      routePoint = routePoint || { x1: 18, y1: 73.4, x2: 82, y2: 73.4, cx: 58, cy: 52 };
+      const departureStart = pointFrom(routePoint.departureStart, routePoint.x1, routePoint.y1);
+      const departureEnd = pointFrom(routePoint.departureEnd, routePoint.x2, routePoint.y2);
+      const hold = pointFrom(routePoint.hold, routePoint.holdX, routePoint.holdY) || pointBefore(departureStart, departureEnd, 6);
+      const exitEnd = pointFrom(routePoint.exitEnd, routePoint.exitX, routePoint.exitY) || pointPast(departureStart, departureEnd, 12);
+      const arrivalStart = pointFrom(routePoint.arrivalStart, routePoint.arrivalX, routePoint.arrivalY) || pointBefore(departureStart, departureEnd, 10);
+      const arrivalExit = pointFrom(routePoint.arrivalExit, routePoint.arrivalExitX, routePoint.arrivalExitY) || departureEnd;
+      const taxiControl2 = pointFrom(routePoint.taxiControl2, routePoint.cx, routePoint.cy) || hold;
+      return { departureStart, departureEnd, hold, exitEnd, arrivalStart, arrivalExit, taxiControl: routePoint.taxiControl, taxiControl2 };
+    }
+
+    function pointFrom(point, x, y) {
+      if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) return point;
+      if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+      return null;
+    }
+
+    function pointBefore(start, end, distance) {
+      const unit = runwayUnitVector(start, end);
+      return { x: roundSvg(start.x - unit.x * distance), y: roundSvg(start.y - unit.y * distance) };
+    }
+
+    function pointPast(start, end, distance) {
+      const unit = runwayUnitVector(start, end);
+      return { x: roundSvg(end.x + unit.x * distance), y: roundSvg(end.y + unit.y * distance) };
+    }
+
+    function runwayUnitVector(start, end) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      return { x: dx / length, y: dy / length };
+    }
+
+    function pathLine(start, end) {
+      return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+    }
+
+    function roundSvg(value) {
+      return Math.round(value * 100) / 100;
+    }
+
     function getAirportMapTemplate(airport, gates) {
       if (airport && airport.id === "frankfurt") {
         return {
@@ -2760,9 +2865,9 @@
             { x: 27, y: 47, width: 38, height: 7 }
           ],
           terminals: [
-            { x: 22, y: 35, width: 29, height: 8.5, label: "T1 A/B/Z" },
-            { x: 62, y: 39, width: 12, height: 7.5, label: "T2 D/E" },
-            { x: 48, y: 56, width: 12, height: 6.5, label: "T3" }
+            { x: 22, y: 35, width: 29, height: 8.5, label: "T1 A/B/Z", showLabel: false },
+            { x: 62, y: 39, width: 12, height: 7.5, label: "T2 D/E", showLabel: false },
+            { x: 48, y: 56, width: 12, height: 6.5, label: "T3", showLabel: false }
           ],
           taxiways: [
             { d: "M 14 23 L 88 23" },
@@ -2774,16 +2879,16 @@
             { d: "M 21 42 C 17 48, 15 57, 14 73" }
           ],
           gates: [
-            { gate: "A18", x: 25, y: 31 },
-            { gate: "B24", x: 39, y: 31 },
-            { gate: "C7", x: 58, y: 50 },
-            { gate: "Z52", x: 49, y: 31 }
+            { gate: "A18", x: 25, y: 48, labelX: 20.8, labelY: 53.3 },
+            { gate: "B24", x: 39, y: 48, labelX: 34.7, labelY: 52.7 },
+            { gate: "C7", x: 66, y: 53, labelX: 65.6, labelY: 49 },
+            { gate: "Z52", x: 53, y: 48, labelX: 54.6, labelY: 49.3 }
           ].concat(buildAirportGatePositions(gates).filter(position => !["A18", "B24", "C7", "Z52"].includes(position.gate))),
           runways: [
-            { label: "07L/25R", x: 10, y: 16, width: 80, height: 5.2, labelX: 12, labelY: 14, angle: 0, routePoints: [{ x1: 14, y1: 18.6, x2: 86, y2: 18.6, cx: 48, cy: 24 }] },
-            { label: "07C/25C", x: 10, y: 62, width: 80, height: 5.4, labelX: 12, labelY: 60, angle: 0, routePoints: [{ x1: 14, y1: 64.7, x2: 86, y2: 64.7, cx: 57, cy: 55 }] },
-            { label: "07R/25L", x: 10, y: 78, width: 80, height: 5.4, labelX: 12, labelY: 76, angle: 0, routePoints: [{ x1: 14, y1: 80.7, x2: 86, y2: 80.7, cx: 55, cy: 70 }] },
-            { label: "18", x: 11, y: 34, width: 5.4, height: 41, labelX: 18, labelY: 38, angle: 90, routePoints: [{ x1: 13.7, y1: 38, x2: 13.7, y2: 72, cx: 22, cy: 54 }] }
+            { label: "07L/25R", x: 10, y: 16, width: 80, height: 5.2, labelX: 12, labelY: 14, usage: ["arrival"], routePoints: [{ x1: 14, y1: 18.6, x2: 86, y2: 18.6, holdX: 57, holdY: 24, cx: 48, cy: 24, exitX: 98, exitY: 18.6, arrivalX: 2, arrivalY: 18.6, arrivalExitX: 57, arrivalExitY: 24 }] },
+            { label: "07C/25C", x: 10, y: 62, width: 80, height: 5.4, labelX: 4, labelY: 68.5, usage: ["departure"], routePoints: [{ x1: 14, y1: 64.7, x2: 86, y2: 64.7, holdX: 52, holdY: 57, cx: 57, cy: 55, exitX: 98, exitY: 64.7, arrivalX: 2, arrivalY: 64.7, arrivalExitX: 52, arrivalExitY: 57 }] },
+            { label: "07R/25L", x: 10, y: 78, width: 80, height: 5.4, labelX: 4, labelY: 86.5, usage: ["arrival", "departure"], routePoints: [{ x1: 14, y1: 80.7, x2: 86, y2: 80.7, holdX: 40, holdY: 72, cx: 55, cy: 70, exitX: 98, exitY: 80.7, arrivalX: 2, arrivalY: 80.7, arrivalExitX: 40, arrivalExitY: 72 }] },
+            { label: "18", x: 11, y: 34, width: 5.4, height: 41, labelX: 6.5, labelY: 35, usage: ["departure"], routePoints: [{ x1: 13.7, y1: 38, x2: 13.7, y2: 72, holdX: 20, holdY: 42, cx: 22, cy: 54, exitX: 13.7, exitY: 86, arrivalX: 13.7, arrivalY: 26, arrivalExitX: 20, arrivalExitY: 42 }] }
           ],
           routeHub: { x: 51, y: 49 }
         };
@@ -2797,18 +2902,18 @@
             { x: 36, y: 16, width: 26, height: 18 }
           ],
           terminals: [
-            { x: 22, y: 35, width: 17, height: 10, label: "T1 A/B" },
-            { x: 42, y: 24, width: 16, height: 10, label: "T2 C/D" }
+            { x: 22, y: 35, width: 17, height: 10, label: "T1 A/B", showLabel: false },
+            { x: 42, y: 24, width: 16, height: 10, label: "T2 C/D", showLabel: false }
           ],
           gates: [
-            { gate: "A3", x: 23, y: 32 },
-            { gate: "B8", x: 33, y: 49 },
-            { gate: "C12", x: 48, y: 20 },
-            { gate: "D4", x: 59, y: 35 }
+            { gate: "A3", x: 21, y: 52, labelX: 17.5, labelY: 53.5 },
+            { gate: "B8", x: 35, y: 55, labelX: 32.5, labelY: 59 },
+            { gate: "C12", x: 49, y: 38, labelX: 47, labelY: 36 },
+            { gate: "D4", x: 64, y: 40, labelX: 63, labelY: 36.5 }
           ].concat(buildAirportGatePositions(gates).filter(position => !["A3", "B8", "C12", "D4"].includes(position.gate))),
           runways: [
-            { label: "06/24", x: 12, y: 69, width: 76, height: 6.2, labelX: 14, labelY: 66, angle: 0, routePoints: [{ x1: 16, y1: 72.1, x2: 85, y2: 72.1, cx: 61, cy: 58 }] },
-            { label: "12/30", x: 17, y: 75, width: 68, height: 5.8, labelX: 20, labelY: 91, angle: -28, routePoints: [{ x1: 24, y1: 88, x2: 80, y2: 62, cx: 53, cy: 68 }] }
+            { label: "06/24", x: 12, y: 69, width: 76, height: 6.2, labelX: 14, labelY: 66, usage: ["arrival", "departure"], routePoints: [{ x1: 16, y1: 72.1, x2: 85, y2: 72.1, holdX: 61, holdY: 58, cx: 61, cy: 58, exitX: 96, exitY: 72.1, arrivalX: 4, arrivalY: 72.1, arrivalExitX: 61, arrivalExitY: 58 }] },
+            { label: "12/30", x: 17, y: 75, width: 68, height: 5.8, labelX: 20, labelY: 91, rotate: -28, usage: ["arrival", "departure"], routePoints: [{ x1: 24, y1: 88, x2: 80, y2: 62, holdX: 53, holdY: 68, cx: 53, cy: 68, exitX: 91, exitY: 57, arrivalX: 13, arrivalY: 93, arrivalExitX: 53, arrivalExitY: 68 }] }
           ],
           routeHub: { x: 52, y: 55 }
         };
@@ -2820,33 +2925,43 @@
         terminals: [{ x: 13, y: 17, width: 34, height: 22, label: "Terminal" }],
         gates: buildAirportGatePositions(gates),
         runways: [
-          { label: airport && airport.runwayLayout && Array.isArray(airport.runwayLayout.runways) && airport.runwayLayout.runways[0] ? airport.runwayLayout.runways[0] : "RWY", x: 14, y: 70, width: 72, height: 6.8, labelX: 16, labelY: 66, angle: 0, routePoints: [{ x1: 18, y1: 73.4, x2: 82, y2: 73.4, cx: 62, cy: 60 }] }
+          { label: airport && airport.runwayLayout && Array.isArray(airport.runwayLayout.runways) && airport.runwayLayout.runways[0] ? airport.runwayLayout.runways[0] : "RWY", x: 14, y: 70, width: 72, height: 6.8, labelX: 16, labelY: 66, routePoints: [{ x1: 18, y1: 73.4, x2: 82, y2: 73.4, holdX: 62, holdY: 60, cx: 62, cy: 60, exitX: 94, exitY: 73.4, arrivalX: 6, arrivalY: 73.4, arrivalExitX: 62, arrivalExitY: 60 }] }
         ],
         routeHub: { x: 58, y: 52 }
       };
     }
 
     function airportPointOnRoute(route, progress, tripType) {
-      if (tripType === "departure" && progress > 1) return airportPointPastRunway(route, progress);
-      const length = route.pathElement.getTotalLength();
-      const point = route.pathElement.getPointAtLength(length * Math.max(0, Math.min(1, progress)));
-      return { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+      const segments = Array.isArray(route.segments) ? route.segments : [];
+      const segment = segments.find(item => progress <= item.end) || segments[segments.length - 1];
+      if (!segment || !segment.pathElement) return { x: 50, y: 50, angle: 0 };
+      const localProgress = (progress - segment.start) / Math.max(0.01, segment.end - segment.start);
+      return airportPointOnSegment(segment, localProgress, tripType);
     }
 
-    function airportPointPastRunway(route, progress) {
-      const angle = ((route.angle || 0) * Math.PI) / 180;
-      const distance = Math.min(progress - 1, 0.2) * 60;
-      const x = route.departureEnd.x + Math.cos(angle) * distance;
-      const y = route.departureEnd.y + Math.sin(angle) * distance;
+    function airportPointOnSegment(segment, progress, tripType) {
+      const length = segment.pathElement.getTotalLength();
+      const clamped = Math.max(0, Math.min(1, progress));
+      const distance = length * clamped;
+      const point = segment.pathElement.getPointAtLength(distance);
+      const sampleDistance = distance >= length - 0.5
+        ? Math.max(0, distance - 0.5)
+        : Math.min(length, distance + 0.5);
+      const sample = segment.pathElement.getPointAtLength(sampleDistance);
+      const angle = distance >= length - 0.5
+        ? Math.atan2(point.y - sample.y, point.x - sample.x) * 180 / Math.PI
+        : Math.atan2(sample.y - point.y, sample.x - point.x) * 180 / Math.PI;
       return {
-        x: Math.round(Math.max(2, Math.min(98, x)) * 100) / 100,
-        y: Math.round(Math.max(2, Math.min(98, y)) * 100) / 100
+        x: roundSvg(Math.max(2, Math.min(98, point.x))),
+        y: roundSvg(Math.max(2, Math.min(98, point.y))),
+        angle: Number.isFinite(angle) ? angle : 0
       };
     }
 
     function createAirportPlaneMarker(flight, previous, point, routeAngle) {
       const alert = hasSignificantFlightDelay(flight) || /cancel|alert|divert/i.test(flight.status || "");
-      const angle = ((flight.type === "arrival" ? routeAngle + 180 : routeAngle) || 0) + 90;
+      const movementAngle = airportMovementAngle(previous, point);
+      const angle = (movementAngle ?? routeAngle ?? 0) + 90;
       const frame = getAircraftSpriteFrame(flight);
       const marker = createSvgElement("g", {
         class: `airport-plane-marker ${flight.type}${alert ? " alert" : ""}`,
@@ -2878,7 +2993,7 @@
       marker.appendChild(icon);
       marker.appendChild(createSvgText(shortTripCode(flight), 0, 10.0, ""));
 
-      if (!prefersReducedMotion() && (previous.x !== point.x || previous.y !== point.y)) {
+      if (shouldAnimateAirportPlane(previous, point, routeAngle)) {
         marker.setAttribute("transform", `translate(${previous.x} ${previous.y})`);
         marker.appendChild(createSvgElement("animateTransform", {
           attributeName: "transform",
@@ -2892,6 +3007,29 @@
         }));
       }
       return marker;
+    }
+
+    function shouldAnimateAirportPlane(previous, point, routeAngle) {
+      if (prefersReducedMotion() || previous.x === point.x && previous.y === point.y) return false;
+      const dx = point.x - previous.x;
+      const dy = point.y - previous.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 0.15 || distance > 18) return false;
+      const angle = airportMovementAngle(previous, point);
+      if (angle === null) return false;
+      const delta = Math.abs(normalizeAngleDelta(angle - (routeAngle || 0)));
+      return delta <= 110;
+    }
+
+    function airportMovementAngle(previous, point) {
+      const dx = point.x - previous.x;
+      const dy = point.y - previous.y;
+      if (Math.hypot(dx, dy) < 0.15) return null;
+      return Math.atan2(dy, dx) * 180 / Math.PI;
+    }
+
+    function normalizeAngleDelta(value) {
+      return ((value + 180) % 360 + 360) % 360 - 180;
     }
 
     function getAircraftSpriteFrame(flight) {
@@ -2919,12 +3057,21 @@
       }
 
       if (isFlightDeparted(status)) {
+        delete state.airportTaxiMotionStartedAt[flight.id];
         return interpolateRange(departedMapElapsedMs(flight.id), 0, AIRPORT_DEPARTED_MAP_HIDE_MS, 1.02, 1.18);
       }
-      if (!isFlightTaxiing(status)) return 0;
+      if (!isFlightTaxiing(status)) {
+        delete state.airportTaxiMotionStartedAt[flight.id];
+        return 0;
+      }
+      if (!state.airportTaxiMotionStartedAt[flight.id]) state.airportTaxiMotionStartedAt[flight.id] = Date.now();
+      const taxiElapsed = Date.now() - state.airportTaxiMotionStartedAt[flight.id];
+      const taxiMotion = Math.min(1, taxiElapsed / 9000);
       if (referenceMinutes <= effective - 5) return 0.15;
-      if (referenceMinutes <= effective) return interpolateRange(referenceMinutes, effective - 5, effective, 0.15, 0.42);
-      if (referenceMinutes <= effective + 3) return interpolateRange(referenceMinutes, effective, effective + 3, 0.42, 0.96);
+      if (referenceMinutes < effective) return interpolateRange(referenceMinutes, effective - 5, effective, 0.15, 0.42);
+      if (taxiMotion < 0.3) return interpolateRange(taxiMotion, 0, 0.3, 0.42, 0.5);
+      if (taxiMotion < 0.74) return interpolateRange(taxiMotion, 0.3, 0.74, 0.5, 0.96);
+      if (taxiMotion < 0.92) return interpolateRange(taxiMotion, 0.74, 0.92, 0.96, 1.02);
       return 0.96;
     }
 

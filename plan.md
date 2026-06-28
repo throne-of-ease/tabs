@@ -1,3 +1,3 @@
-* zvetsi ikony letadla o 50%
-* chovani letadla pri startu, taxing musi kopirovat zlutou caru na zacatek vzletaci drahy a potom musi startovat po draze
-* natoc letadlo spranym smerem
+* letadlo zastavuje na konci drahy pri vzletani na konci a pak se tam otoci, to se nesmi stavat (udelej to tak aby to bylo nejlip realisticke)
+* u shcematu letsite se jednotlive drahy a terminaly nesmi prekryvat
+* oprav prazske letiste je to rahzazene
